@@ -30,10 +30,10 @@ def test_iso800_converts_to_ev100_lower_than_metered_ev():
     assert ev == pytest_approx(expected, abs=0.001)
 
 
-def test_camera_exposure_is_negative_ev_with_compensation_and_calibration():
-    assert camera_exposure_from_ev100(15.0) == pytest_approx(-15.0)
-    assert camera_exposure_from_ev100(15.0, exposure_compensation=1.0) == pytest_approx(-14.0)
-    assert camera_exposure_from_ev100(15.0, calibration_offset=2.0) == pytest_approx(-13.0)
+def test_camera_exposure_is_positive_ev_with_compensation_and_calibration():
+    assert camera_exposure_from_ev100(15.0) == pytest_approx(15.0)
+    assert camera_exposure_from_ev100(15.0, exposure_compensation=1.0) == pytest_approx(16.0)
+    assert camera_exposure_from_ev100(15.0, calibration_offset=2.0) == pytest_approx(17.0)
 
 
 def test_parse_shutter_accepts_fraction_and_decimal():
@@ -50,12 +50,12 @@ def test_luminance_stops_from_middle_gray():
 def test_direct_ev100_settings_do_not_need_physical_camera_shutter_values():
     settings = DirectEV100Settings(ev100=10.0)
     assert settings.ev100 == pytest_approx(10.0)
-    assert settings.maya_camera_exposure == pytest_approx(-10.0)
+    assert settings.maya_camera_exposure == pytest_approx(10.0)
 
 
 def test_direct_ev100_settings_apply_compensation_and_calibration():
     settings = DirectEV100Settings(ev100=5.0, exposure_compensation=1.0, calibration_offset=-0.5)
-    assert settings.maya_camera_exposure == pytest_approx(-4.5)
+    assert settings.maya_camera_exposure == pytest_approx(5.5)
 
 
 def test_exposure_settings_keep_legacy_physical_camera_calculation():

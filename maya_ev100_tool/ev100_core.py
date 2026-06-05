@@ -219,16 +219,16 @@ def camera_exposure_from_ev100(
     exposure_compensation: float = 0.0,
     calibration_offset: float = 0.0,
 ) -> float:
-    """Convert EV100 to a renderer exposure-stop offset.
+    """Convert EV100 to a Maya/Arnold camera exposure-stop offset.
 
     Arnold/Maya exposure attributes are stop offsets: +1 doubles brightness,
-    -1 halves brightness. Higher photographic EV means a darker exposure,
-    so the neutral starting mapping is negative EV100.
+    -1 halves brightness. For this artist-facing Maya workflow, EV100 is used as
+    the shot-wide view exposure reference, so EV100 12 maps to aiExposure +12.
 
     calibration_offset exists because each studio's Arnold/OCIO/HDRI pipeline may
     define a different baseline after gray-card calibration.
     """
-    return -float(ev100) + float(exposure_compensation) + float(calibration_offset)
+    return float(ev100) + float(exposure_compensation) + float(calibration_offset)
 
 
 def parse_shutter(value: str | float | int) -> float:
