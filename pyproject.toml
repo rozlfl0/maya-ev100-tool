@@ -1,0 +1,13 @@
+[project]
+name = "maya-ev100-tool"
+version = "0.1.0"
+description = "Maya EV100 camera exposure helper MVP for physically based lighting workflows."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "rozlfl0" }]
+license = { text = "MIT" }
+keywords = ["maya", "arnold", "ev100", "physically-based-lighting", "vfx", "lighting"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
