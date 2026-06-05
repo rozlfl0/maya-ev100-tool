@@ -13,8 +13,35 @@ MIDDLE_GRAY_LINEAR = 0.18
 
 
 @dataclass(frozen=True)
+class DirectEV100Settings:
+    """Direct EV100 settings for artist-friendly camera exposure control.
+
+    This mode intentionally does not require or imply shutter speed, f-stop, or ISO.
+    It is safe for motion blur workflows because renderer shutter/motion-blur
+    attributes should remain independent from EV100 exposure metadata.
+    """
+
+    ev100: float = 10.0
+    exposure_compensation: float = 0.0
+    calibration_offset: float = 0.0
+
+    @property
+    def maya_camera_exposure(self) -> float:
+        return camera_exposure_from_ev100(
+            self.ev100,
+            exposure_compensation=self.exposure_compensation,
+            calibration_offset=self.calibration_offset,
+        )
+
+
+@dataclass(frozen=True)
 class ExposureSettings:
-    """Physical camera settings expressed in real camera terms."""
+    """Physical camera settings expressed in real camera terms.
+
+    Kept for advanced users who want to derive EV100 from ISO/shutter/f-stop.
+    The shutter value is exposure metadata only; UI code must not sync it to
+    Maya/Arnold motion-blur shutter attributes unless explicitly requested.
+    """
 
     fstop: float = 16.0
     shutter_seconds: float = 1 / 125.0

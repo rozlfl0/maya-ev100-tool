@@ -1,6 +1,8 @@
 import math
 
 from maya_ev100_tool.ev100_core import (
+    ExposureSettings,
+    DirectEV100Settings,
     ev100_from_camera_settings,
     camera_exposure_from_ev100,
     parse_shutter,
@@ -34,6 +36,22 @@ def test_luminance_stops_from_middle_gray():
     assert luminance_stops_from_middle_gray(0.18) == pytest_approx(0.0)
     assert luminance_stops_from_middle_gray(0.36) == pytest_approx(1.0)
     assert luminance_stops_from_middle_gray(0.09) == pytest_approx(-1.0)
+
+
+def test_direct_ev100_settings_do_not_need_physical_camera_shutter_values():
+    settings = DirectEV100Settings(ev100=10.0)
+    assert settings.ev100 == pytest_approx(10.0)
+    assert settings.maya_camera_exposure == pytest_approx(-10.0)
+
+
+def test_direct_ev100_settings_apply_compensation_and_calibration():
+    settings = DirectEV100Settings(ev100=5.0, exposure_compensation=1.0, calibration_offset=-0.5)
+    assert settings.maya_camera_exposure == pytest_approx(-4.5)
+
+
+def test_exposure_settings_keep_legacy_physical_camera_calculation():
+    settings = ExposureSettings(fstop=16.0, shutter_seconds=1 / 125.0, iso=100.0)
+    assert settings.ev100 == pytest_approx(14.966, abs=0.001)
 
 
 def pytest_approx(value, **kwargs):
