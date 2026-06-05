@@ -61,17 +61,13 @@ def test_exposure_settings_keep_legacy_physical_camera_calculation():
 
 
 def test_calibration_swatches_match_reference_reflectance_values():
-    assert [swatch.name for swatch in CALIBRATION_SWATCHES] == [
-        "white_paper",
-        "middle_gray",
-        "charcoal",
-    ]
-    assert [swatch.reflectance for swatch in CALIBRATION_SWATCHES] == pytest_approx([0.71, 0.18, 0.031])
+    assert [swatch.name for swatch in CALIBRATION_SWATCHES] == ["middle_gray"]
+    assert [swatch.reflectance for swatch in CALIBRATION_SWATCHES] == pytest_approx([0.18])
 
 
 def test_calibration_swatch_rgb_is_neutral_reflectance_triplet():
-    white = calibration_swatch_by_name("white_paper")
-    assert white.rgb == pytest_approx((0.71, 0.71, 0.71))
+    gray = calibration_swatch_by_name("middle_gray")
+    assert gray.rgb == pytest_approx((0.18, 0.18, 0.18))
 
 
 def test_calibration_cubes_default_to_45_degree_x_rotation():

@@ -121,30 +121,21 @@ def show() -> None:
     cmds.setParent("..")
 
     cmds.separator(height=8, style="in")
-    cmds.button(label="캘리브레이션 큐브 생성 (0.71 / 0.18 / 0.031)", command=lambda *_args: create_calibration_cubes())
+    cmds.button(label="그레이 캘리브레이션 큐브 생성 (0.18)", command=lambda *_args: create_calibration_cubes())
 
     cmds.separator(height=8, style="in")
-    cmds.text(label="2) Dome HDRI 캘리브레이션: 측정 RGB를 넣고 Dome Light exposure를 맞춥니다.", align="left")
-    hdri_target = cmds.optionMenu(label="타겟 픽셀")
-    for swatch in CALIBRATION_SWATCHES:
-        cmds.menuItem(label=swatch.label)
-    dome_exposure = cmds.floatFieldGrp(label="현재 Dome Exposure", value1=0.0, numberOfFields=1, precision=3)
+    cmds.text(label="2) Dome HDRI 캘리브레이션: Dome Light를 선택하고 그레이 큐브 측정 RGB를 넣습니다.", align="left")
+    calibration_swatch = CALIBRATION_SWATCHES[0]
+    cmds.text(label="타겟 픽셀: %s" % calibration_swatch.label, align="left")
     hdri_r = cmds.floatFieldGrp(label="측정 R", value1=0.180, numberOfFields=1, precision=4)
     hdri_g = cmds.floatFieldGrp(label="측정 G", value1=0.180, numberOfFields=1, precision=4)
     hdri_b = cmds.floatFieldGrp(label="측정 B", value1=0.180, numberOfFields=1, precision=4)
     hdri_result = cmds.text(label="Dome 캘리브레이션: -", align="left")
 
-    def _selected_calibration_swatch():
-        selected_label = cmds.optionMenu(hdri_target, query=True, value=True)
-        for swatch in CALIBRATION_SWATCHES:
-            if swatch.label == selected_label:
-                return swatch
-        raise RuntimeError("Unknown calibration target: %s" % selected_label)
-
     def _analyze_dome_exposure_with_current(current_dome_exposure=None):
-        swatch = _selected_calibration_swatch()
         if current_dome_exposure is None:
-            current_dome_exposure = cmds.floatFieldGrp(dome_exposure, query=True, value1=True)
+            dome_node = get_selected_exposure_node()
+            current_dome_exposure = cmds.getAttr("%s.exposure" % dome_node)
         result_data = estimate_hdri_ev_calibration(
             current_ev100=cmds.floatFieldGrp(ev100, query=True, value1=True),
             measured_rgb=(
@@ -152,7 +143,7 @@ def show() -> None:
                 cmds.floatFieldGrp(hdri_g, query=True, value1=True),
                 cmds.floatFieldGrp(hdri_b, query=True, value1=True),
             ),
-            target_reflectance=swatch.reflectance,
+            target_reflectance=calibration_swatch.reflectance,
             current_dome_exposure=current_dome_exposure,
         )
         direction = "어두움 → 올리기" if result_data.correction_stops > 0.0 else "밝음 → 낮추기"
@@ -180,10 +171,8 @@ def show() -> None:
     def apply_dome_exposure_to_selected(*_args):
         dome_node = get_selected_exposure_node()
         current_exposure = cmds.getAttr("%s.exposure" % dome_node)
-        cmds.floatFieldGrp(dome_exposure, edit=True, value1=current_exposure)
         result_data = _analyze_dome_exposure_with_current(current_exposure)
         cmds.setAttr("%s.exposure" % dome_node, result_data.recommended_dome_exposure)
-        cmds.floatFieldGrp(dome_exposure, edit=True, value1=result_data.recommended_dome_exposure)
         cmds.inViewMessage(
             amg="Applied Dome exposure <hl>%.3f</hl> to %s" % (result_data.recommended_dome_exposure, dome_node),
             pos="topCenter",
@@ -191,14 +180,14 @@ def show() -> None:
         )
 
     cmds.rowLayout(numberOfColumns=2, columnWidth2=(180, 220), adjustableColumn=2)
-    cmds.button(label="Dome Exposure 분석", command=analyze_dome_exposure)
+    cmds.button(label="선택 Dome Exposure 분석", command=analyze_dome_exposure)
     cmds.button(label="선택한 Dome Light에 적용", command=apply_dome_exposure_to_selected)
     cmds.setParent("..")
 
     cmds.separator(height=8, style="in")
     cmds.text(
         label="워크플로우: EV100은 카메라/시나리오 기준, 타겟 픽셀 맞추기는 Dome Light exposure 기준입니다.\n"
-        "측정 RGB는 캘리브레이션 큐브 면에서 얻은 linear render value여야 합니다. 모션블러 셔터는 건드리지 않습니다.",
+        "Dome Light를 선택한 상태로 분석/적용합니다. 측정 RGB는 0.18 그레이 큐브 면에서 얻은 linear render value여야 합니다. 모션블러 셔터는 건드리지 않습니다.",
         align="left",
     )
 
@@ -209,9 +198,8 @@ def show() -> None:
 def create_calibration_cubes(size: float = 1.0, spacing: float = 1.4) -> str:
     """Create neutral reflectance cubes for PBL exposure calibration.
 
-    The cubes use Lambert materials with linear RGB reflectance values:
-    0.71 white paper, 0.18 middle gray, and 0.031 charcoal.
-    They are intended for render/pixel-inspector calibration, not beauty shading.
+    The cube uses a Lambert material with 0.18 linear RGB reflectance.
+    It is intended for render/pixel-inspector calibration, not beauty shading.
     """
     _require_maya()
     group = cmds.group(empty=True, name="PBL_Calibration_Cubes_GRP")
@@ -238,7 +226,7 @@ def create_calibration_cubes(size: float = 1.0, spacing: float = 1.4) -> str:
 
     cmds.select(group, replace=True)
     cmds.inViewMessage(
-        amg="Created <hl>PBL calibration cubes</hl>: 0.71 / 0.18 / 0.031",
+        amg="Created <hl>PBL middle gray calibration cube</hl>: 0.18",
         pos="topCenter",
         fade=True,
     )

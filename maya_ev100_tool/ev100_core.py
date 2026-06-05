@@ -59,22 +59,10 @@ class EV100Scenario:
 
 CALIBRATION_SWATCHES = (
     CalibrationSwatch(
-        name="white_paper",
-        label="White Paper 0.71",
-        reflectance=0.71,
-        description="Bright diffuse reference; should not clip when calibrating highlights.",
-    ),
-    CalibrationSwatch(
         name="middle_gray",
         label="Middle Gray 0.18",
         reflectance=0.18,
-        description="18% middle-gray reference for neutral exposure checks.",
-    ),
-    CalibrationSwatch(
-        name="charcoal",
-        label="Charcoal 0.031",
-        reflectance=0.031,
-        description="Dark diffuse reference for shadow/min EV calibration.",
+        description="18% middle-gray reference for neutral Dome exposure calibration.",
     ),
 )
 
