@@ -199,10 +199,11 @@ def show() -> None:
     )
 
     local_tab = cmds.columnLayout(parent=tabs, adjustableColumn=True, rowSpacing=8, columnAttach=("both", 10))
-    cmds.text(label="로컬 라이트: 루멘 프리셋으로 Rect / Point / Spot 라이트를 만들고 그레이 픽셀값으로 보정합니다.", align="left")
-    local_preset_menu = cmds.optionMenu(label="라이트 프리셋")
+    cmds.text(label="로컬 라이트: 상황 프리셋을 고르면 타입/루멘/거리/크기를 자동으로 잡고, 선택한 오브젝트 앞에 바로 배치합니다.", align="left")
+    local_preset_menu = cmds.optionMenu(label="상황 프리셋")
     for preset in LOCAL_LIGHT_PRESETS:
         cmds.menuItem(label=_local_light_preset_label(preset))
+    cmds.frameLayout(label="Advanced: 거리 / 크기 / 물리값", collapsable=True, collapse=True, marginWidth=6, marginHeight=6)
     local_lumens = cmds.floatFieldGrp(label="루멘", value1=LOCAL_LIGHT_PRESETS[0].lumens, numberOfFields=1, precision=1)
     local_kelvin = cmds.floatFieldGrp(label="색온도 Kelvin", value1=LOCAL_LIGHT_PRESETS[0].kelvin, numberOfFields=1, precision=0)
     rect_width = cmds.floatFieldGrp(label="Rect 가로", value1=1.0, numberOfFields=1, precision=3)
@@ -212,6 +213,7 @@ def show() -> None:
     source_size = cmds.floatFieldGrp(label="소스 크기 m", value1=0.03, numberOfFields=1, precision=3)
     use_selected_target = cmds.checkBox(label="선택 오브젝트 중심을 타겟으로 사용", value=True)
     create_gray_card = cmds.checkBox(label="타겟 위치에 0.18 그레이 카드 생성", value=True)
+    cmds.setParent("..")
     local_note = cmds.text(label="", align="left")
     local_r = cmds.floatFieldGrp(label="측정 R", value1=0.180, numberOfFields=1, precision=4)
     local_g = cmds.floatFieldGrp(label="측정 G", value1=0.180, numberOfFields=1, precision=4)
@@ -266,7 +268,7 @@ def show() -> None:
             use_selected_target=cmds.checkBox(use_selected_target, query=True, value=True),
             create_gray_card=cmds.checkBox(create_gray_card, query=True, value=True),
         )
-        cmds.inViewMessage(amg="Created local light distance rig <hl>%s</hl>" % node, pos="topCenter", fade=True)
+        cmds.inViewMessage(amg="선택한 오브젝트 앞에 로컬라이트 생성 <hl>%s</hl>" % node, pos="topCenter", fade=True)
         return node
 
     def _analyze_local_light_with_current(node=None):
@@ -313,13 +315,12 @@ def show() -> None:
         return result_data
 
     cmds.optionMenu(local_preset_menu, edit=True, changeCommand=load_local_preset)
-    cmds.rowLayout(numberOfColumns=4, columnWidth4=(150, 170, 170, 190), adjustableColumn=4)
-    cmds.button(label="Local Light 생성", command=create_local_light_from_ui)
-    cmds.button(label="거리 Rig 생성", command=create_local_light_rig_from_ui)
+    cmds.rowLayout(numberOfColumns=3, columnWidth3=(220, 170, 170), adjustableColumn=1)
+    cmds.button(label="선택 오브젝트 앞에 생성", command=create_local_light_rig_from_ui)
     cmds.button(label="선택 Local 분석", command=analyze_local_light)
     cmds.button(label="선택 Local 적용", command=apply_local_light)
     cmds.setParent("..")
-    cmds.text(label="거리 Rig는 선택 오브젝트 중심 또는 원점에 타겟/거리 라인/0.18 그레이카드를 만들고, 라이트를 지정 거리만큼 배치해 타겟을 바라보게 합니다. 루멘은 초기 스케일, 최종값은 그레이 측정으로 보정합니다.", align="left")
+    cmds.text(label="기본은 프리셋만 고르고 버튼을 누르면 됩니다. 거리/크기/루멘은 Advanced에서만 필요할 때 조절하고, 최종 밝기는 그레이 측정으로 보정합니다.", align="left")
 
     cmds.tabLayout(tabs, edit=True, tabLabel=((env_tab, "Env Light"), (local_tab, "Local Light")))
     cmds.showWindow(window)
