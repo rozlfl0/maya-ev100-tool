@@ -130,10 +130,10 @@ def show() -> None:
     hdri_target = cmds.optionMenu(label="타겟 픽셀")
     for swatch in CALIBRATION_SWATCHES:
         cmds.menuItem(label=swatch.label)
-    dome_exposure = cmds.floatFieldGrp(label="현재 Dome Exposure", value1=0.0, numberOfFields=1)
-    hdri_r = cmds.floatFieldGrp(label="측정 R", value1=0.18, numberOfFields=1)
-    hdri_g = cmds.floatFieldGrp(label="측정 G", value1=0.18, numberOfFields=1)
-    hdri_b = cmds.floatFieldGrp(label="측정 B", value1=0.18, numberOfFields=1)
+    dome_exposure = cmds.floatFieldGrp(label="현재 Dome Exposure", value1=0.0, numberOfFields=1, precision=3)
+    hdri_r = cmds.floatFieldGrp(label="측정 R", value1=0.180, numberOfFields=1, precision=4)
+    hdri_g = cmds.floatFieldGrp(label="측정 G", value1=0.180, numberOfFields=1, precision=4)
+    hdri_b = cmds.floatFieldGrp(label="측정 B", value1=0.180, numberOfFields=1, precision=4)
     hdri_result = cmds.text(label="Dome 캘리브레이션: -", align="left")
 
     def _selected_calibration_swatch():
