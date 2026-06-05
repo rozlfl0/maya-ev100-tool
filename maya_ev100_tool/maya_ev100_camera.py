@@ -17,7 +17,13 @@ MVP behavior:
 
 from __future__ import annotations
 
-from .ev100_core import CALIBRATION_SWATCHES, DirectEV100Settings, ExposureSettings, parse_shutter
+from .ev100_core import (
+    CALIBRATION_CUBE_ROTATE_X_DEGREES,
+    CALIBRATION_SWATCHES,
+    DirectEV100Settings,
+    ExposureSettings,
+    parse_shutter,
+)
 
 try:
     from maya import cmds
@@ -114,6 +120,7 @@ def create_calibration_cubes(size: float = 1.0, spacing: float = 1.4) -> str:
         cube = cmds.polyCube(name="PBL_%s_cube" % swatch.name, width=size, height=size, depth=size)[0]
         cmds.setAttr("%s.translateX" % cube, start_x + spacing * index)
         cmds.setAttr("%s.translateY" % cube, size / 2.0)
+        cmds.setAttr("%s.rotateX" % cube, CALIBRATION_CUBE_ROTATE_X_DEGREES)
         cmds.parent(cube, group)
 
         shader = _create_lambert_reflectance_shader(swatch.name, swatch.rgb)

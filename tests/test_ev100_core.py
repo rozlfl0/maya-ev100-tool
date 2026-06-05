@@ -1,6 +1,7 @@
 import math
 
 from maya_ev100_tool.ev100_core import (
+    CALIBRATION_CUBE_ROTATE_X_DEGREES,
     CALIBRATION_SWATCHES,
     DirectEV100Settings,
     ExposureSettings,
@@ -68,6 +69,10 @@ def test_calibration_swatches_match_reference_reflectance_values():
 def test_calibration_swatch_rgb_is_neutral_reflectance_triplet():
     white = calibration_swatch_by_name("white_paper")
     assert white.rgb == pytest_approx((0.71, 0.71, 0.71))
+
+
+def test_calibration_cubes_default_to_45_degree_x_rotation():
+    assert CALIBRATION_CUBE_ROTATE_X_DEGREES == pytest_approx(45.0)
 
 
 def pytest_approx(value, **kwargs):

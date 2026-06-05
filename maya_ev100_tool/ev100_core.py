@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 
 MIDDLE_GRAY_LINEAR = 0.18
+CALIBRATION_CUBE_ROTATE_X_DEGREES = 45.0
 
 
 @dataclass(frozen=True)
