@@ -78,11 +78,13 @@ def test_calibration_cubes_default_to_45_degree_x_rotation():
     assert CALIBRATION_CUBE_ROTATE_X_DEGREES == pytest_approx(45.0)
 
 
-def test_ev100_scenarios_include_exterior_and_interior_reference_values():
+def test_ev100_scenarios_match_image_reference_values_with_korean_labels():
     scenarios = {scenario.name: scenario for scenario in EV100_SCENARIOS}
-    assert scenarios["Sunny exterior noon"].ev100 == pytest_approx(15.0)
-    assert scenarios["Sunny exterior morning 8AM"].ev100 == pytest_approx(13.5)
-    assert scenarios["Bright office interior"].ev100 == pytest_approx(8.0)
+    assert scenarios["맑은 직사광, 깨끗한 하늘 배경"].ev100 == pytest_approx(15.0)
+    assert scenarios["밝은 흐린 날"].category == "야외 낮"
+    assert scenarios["사무실/작업 공간"].display_value == "7-8"
+    assert scenarios["사무실/작업 공간"].ev100 == pytest_approx(7.5)
+    assert len(EV100_SCENARIOS) == 19
 
 
 def test_average_linear_rgb_uses_simple_channel_average():

@@ -50,7 +50,7 @@ LEGACY_PHYSICAL_ATTRS = {
 
 
 def _scenario_label(scenario) -> str:
-    return "%s / EV100 %.1f" % (scenario.name, scenario.ev100)
+    return "[%s] %s / EV100 %s" % (scenario.category, scenario.name, scenario.display_value)
 
 
 def show() -> None:
@@ -62,11 +62,11 @@ def show() -> None:
     window = cmds.window(WINDOW_NAME, title="Physical EV100 Lighting Toolkit", sizeable=False)
     cmds.columnLayout(adjustableColumn=True, rowSpacing=8, columnAttach=("both", 10))
 
-    cmds.text(label="1) Pick a lighting scenario EV100, then apply it to the selected camera.", align="left")
-    scenario_menu = cmds.optionMenu(label="Lighting Scenario")
+    cmds.text(label="1) 라이팅 시나리오 EV100을 고른 뒤 선택한 카메라에 적용합니다.", align="left")
+    scenario_menu = cmds.optionMenu(label="라이팅 시나리오")
     for scenario in EV100_SCENARIOS:
         cmds.menuItem(label=_scenario_label(scenario))
-    ev100 = cmds.floatFieldGrp(label="EV100", value1=EV100_SCENARIOS[0].ev100, numberOfFields=1)
+    ev100 = cmds.floatFieldGrp(label="적용 EV100", value1=EV100_SCENARIOS[0].ev100, numberOfFields=1)
     scenario_note = cmds.text(label="", align="left")
     result = cmds.text(label="EV100: - / Maya exposure: -", align="left")
 
@@ -80,7 +80,16 @@ def show() -> None:
     def load_scenario(*_args):
         scenario = _selected_scenario()
         cmds.floatFieldGrp(ev100, edit=True, value1=scenario.ev100)
-        cmds.text(scenario_note, edit=True, label="%s / EV100 %.1f - %s" % (scenario.category, scenario.ev100, scenario.description))
+        cmds.text(
+            scenario_note,
+            edit=True,
+            label="%s / 표기 EV100 %s / 적용값 %.1f - %s" % (
+                scenario.category,
+                scenario.display_value,
+                scenario.ev100,
+                scenario.description,
+            ),
+        )
         return calculate_only()
 
     def calculate_only(*_args):
@@ -108,24 +117,24 @@ def show() -> None:
 
     cmds.optionMenu(scenario_menu, edit=True, changeCommand=load_scenario)
     cmds.rowLayout(numberOfColumns=3, columnWidth3=(150, 150, 190), adjustableColumn=3)
-    cmds.button(label="Load Scenario EV", command=load_scenario)
-    cmds.button(label="Calculate", command=calculate_only)
-    cmds.button(label="Apply EV100 to Camera", command=apply_to_selected)
+    cmds.button(label="시나리오 EV 불러오기", command=load_scenario)
+    cmds.button(label="계산", command=calculate_only)
+    cmds.button(label="카메라에 EV100 적용", command=apply_to_selected)
     cmds.setParent("..")
 
     cmds.separator(height=8, style="in")
-    cmds.button(label="Create Calibration Cubes (0.71 / 0.18 / 0.031)", command=lambda *_args: create_calibration_cubes())
+    cmds.button(label="캘리브레이션 큐브 생성 (0.71 / 0.18 / 0.031)", command=lambda *_args: create_calibration_cubes())
 
     cmds.separator(height=8, style="in")
-    cmds.text(label="2) Dome HDRI Calibration: enter sampled target RGB, then adjust Dome Light exposure.", align="left")
-    hdri_target = cmds.optionMenu(label="Target Pixel")
+    cmds.text(label="2) Dome HDRI 캘리브레이션: 측정 RGB를 넣고 Dome Light exposure를 맞춥니다.", align="left")
+    hdri_target = cmds.optionMenu(label="타겟 픽셀")
     for swatch in CALIBRATION_SWATCHES:
         cmds.menuItem(label=swatch.label)
-    dome_exposure = cmds.floatFieldGrp(label="Current Dome Exposure", value1=0.0, numberOfFields=1)
-    hdri_r = cmds.floatFieldGrp(label="Measured R", value1=0.18, numberOfFields=1)
-    hdri_g = cmds.floatFieldGrp(label="Measured G", value1=0.18, numberOfFields=1)
-    hdri_b = cmds.floatFieldGrp(label="Measured B", value1=0.18, numberOfFields=1)
-    hdri_result = cmds.text(label="Dome calibration: -", align="left")
+    dome_exposure = cmds.floatFieldGrp(label="현재 Dome Exposure", value1=0.0, numberOfFields=1)
+    hdri_r = cmds.floatFieldGrp(label="측정 R", value1=0.18, numberOfFields=1)
+    hdri_g = cmds.floatFieldGrp(label="측정 G", value1=0.18, numberOfFields=1)
+    hdri_b = cmds.floatFieldGrp(label="측정 B", value1=0.18, numberOfFields=1)
+    hdri_result = cmds.text(label="Dome 캘리브레이션: -", align="left")
 
     def _selected_calibration_swatch():
         selected_label = cmds.optionMenu(hdri_target, query=True, value=True)
@@ -146,13 +155,13 @@ def show() -> None:
             target_reflectance=swatch.reflectance,
             current_dome_exposure=cmds.floatFieldGrp(dome_exposure, query=True, value1=True),
         )
-        direction = "brighter" if result_data.correction_stops > 0.0 else "darker"
+        direction = "어두움 → 올리기" if result_data.correction_stops > 0.0 else "밝음 → 낮추기"
         cmds.text(
             hdri_result,
             edit=True,
             label=(
-                "Avg %.3f / target %.3f / correction %.3f stops (%s)\n"
-                "Recommended Dome Exposure %.3f"
+                "평균 %.3f / 타겟 %.3f / 보정 %.3f stops (%s)\n"
+                "추천 Dome Exposure %.3f"
             )
             % (
                 result_data.measured_average,
@@ -176,14 +185,14 @@ def show() -> None:
         )
 
     cmds.rowLayout(numberOfColumns=2, columnWidth2=(180, 220), adjustableColumn=2)
-    cmds.button(label="Analyze Dome Exposure", command=analyze_dome_exposure)
-    cmds.button(label="Apply to Selected Dome Light", command=apply_dome_exposure_to_selected)
+    cmds.button(label="Dome Exposure 분석", command=analyze_dome_exposure)
+    cmds.button(label="선택한 Dome Light에 적용", command=apply_dome_exposure_to_selected)
     cmds.setParent("..")
 
     cmds.separator(height=8, style="in")
     cmds.text(
-        label="Workflow: EV100 belongs to the camera scenario. Target pixel matching belongs to Dome Light exposure.\n"
-        "Measured RGB must be linear render values from the calibration cube face. Motion blur settings are never changed.",
+        label="워크플로우: EV100은 카메라/시나리오 기준, 타겟 픽셀 맞추기는 Dome Light exposure 기준입니다.\n"
+        "측정 RGB는 캘리브레이션 큐브 면에서 얻은 linear render value여야 합니다. 모션블러 셔터는 건드리지 않습니다.",
         align="left",
     )
 

@@ -74,24 +74,34 @@ importlib.reload(maya_ev100_camera)
 maya_ev100_camera.show()
 ```
 
-## EV100 Scenario Presets
+## EV100 시나리오 프리셋
 
-The UI includes a **Lighting Scenario** dropdown. Current starter references:
+UI의 **라이팅 시나리오** 드롭다운은 형님이 첨부한 EV100 표 기준을 한국어로 옮긴 것입니다.
+범위 값은 드롭다운에는 원래 범위로 표시하고, 실제 적용 EV100은 중간값을 사용합니다.
 
 ```text
-Sunny exterior noon          EV100 15.0
-Sunny exterior morning 8AM   EV100 13.5
-Sunny exterior late afternoon EV100 13.0
-Overcast exterior            EV100 12.0
-Open shade exterior          EV100 11.0
-Bright studio / stage        EV100 9.0
-Bright office interior       EV100 8.0
-Home interior                EV100 6.0
-Dim interior                 EV100 5.0
-Night street                 EV100 2.0
-```
+[야외 낮] 밝은 모래/눈, 직사광 또는 약간 흐린 햇빛        EV100 16
+[야외 낮] 맑은 직사광, 깨끗한 하늘 배경                  EV100 15
+[야외 낮] 흐릿한 햇빛, 구름 낀 하늘 배경                 EV100 14
+[야외 낮] 밝은 흐린 날                                  EV100 13
+[야외 낮] 강한 흐림, 일몰 무렵                          EV100 12
+[야외 낮] 일몰 직전                                    EV100 12-14, 적용값 13
+[야외 낮] 일몰 직후                                    EV100 9-11, 적용값 10
 
-These are practical starting values. Replace/refine them with a studio reference sheet when exact production values are available.
+[야외 밤] 네온/밝은 간판                                EV100 9-10, 적용값 9.5
+[야외 밤] 야간 스포츠, 화재/불타는 건물                  EV100 9
+[야외 밤] 밝은 밤거리                                   EV100 8
+[야외 밤] 밤거리와 쇼윈도                               EV100 7-8, 적용값 7.5
+[야외 밤] 축제/놀이공원                                 EV100 7
+[야외 밤] 야간 차량 통행                                EV100 5
+[야외 밤] 투광 조명 건축물                              EV100 3-5, 적용값 4
+[야외 밤] 멀리 보이는 불 켜진 건물들                    EV100 2
+
+[실내] 갤러리                                           EV100 8-11, 적용값 9.5
+[실내] 무대 쇼/스포츠 이벤트                            EV100 8-9, 적용값 8.5
+[실내] 사무실/작업 공간                                 EV100 7-8, 적용값 7.5
+[실내] 주거 실내                                       EV100 5-7, 적용값 6
+```
 
 ## Camera EV100 Setup
 

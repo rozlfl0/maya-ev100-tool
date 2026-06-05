@@ -50,6 +50,11 @@ class EV100Scenario:
     ev100: float
     category: str
     description: str
+    value_label: str | None = None
+
+    @property
+    def display_value(self) -> str:
+        return self.value_label or ("%.1f" % self.ev100).rstrip("0").rstrip(".")
 
 
 CALIBRATION_SWATCHES = (
@@ -75,16 +80,25 @@ CALIBRATION_SWATCHES = (
 
 
 EV100_SCENARIOS = (
-    EV100Scenario("Sunny exterior noon", 15.0, "Exterior", "Bright direct sun / noon baseline."),
-    EV100Scenario("Sunny exterior morning 8AM", 13.5, "Exterior", "Clear morning exterior starting point."),
-    EV100Scenario("Sunny exterior late afternoon", 13.0, "Exterior", "Lower sun angle / warm afternoon."),
-    EV100Scenario("Overcast exterior", 12.0, "Exterior", "Cloudy daylight, soft sky."),
-    EV100Scenario("Open shade exterior", 11.0, "Exterior", "Subject in shade with daylight sky fill."),
-    EV100Scenario("Bright studio / stage", 9.0, "Interior", "Strong artificial lighting."),
-    EV100Scenario("Bright office interior", 8.0, "Interior", "Typical bright office or shop interior."),
-    EV100Scenario("Home interior", 6.0, "Interior", "Normal residential practical lighting."),
-    EV100Scenario("Dim interior", 5.0, "Interior", "Low practical light / moody interior."),
-    EV100Scenario("Night street", 2.0, "Exterior night", "Streetlights / night exterior starting point."),
+    EV100Scenario("밝은 모래/눈, 직사광 또는 약간 흐린 햇빛", 16.0, "야외 낮", "Light sand or snow in full or slightly hazy sunlight"),
+    EV100Scenario("맑은 직사광, 깨끗한 하늘 배경", 15.0, "야외 낮", "Full or slightly hazy sunlight, clear sky background"),
+    EV100Scenario("흐릿한 햇빛, 구름 낀 하늘 배경", 14.0, "야외 낮", "Hazy sunlight, cloudy sky background"),
+    EV100Scenario("밝은 흐린 날", 13.0, "야외 낮", "Cloudy bright"),
+    EV100Scenario("강한 흐림, 일몰 무렵", 12.0, "야외 낮", "Heavy overcast, at sunset"),
+    EV100Scenario("일몰 직전", 13.0, "야외 낮", "Just before sunset", "12-14"),
+    EV100Scenario("일몰 직후", 10.0, "야외 낮", "Just after sunset", "9-11"),
+    EV100Scenario("네온/밝은 간판", 9.5, "야외 밤", "Neon and Bright signs", "9-10"),
+    EV100Scenario("야간 스포츠, 화재/불타는 건물", 9.0, "야외 밤", "Night Sport, fires & burning buildings"),
+    EV100Scenario("밝은 밤거리", 8.0, "야외 밤", "Bright street scenes"),
+    EV100Scenario("밤거리와 쇼윈도", 7.5, "야외 밤", "Night street scenes and window displays", "7-8"),
+    EV100Scenario("축제/놀이공원", 7.0, "야외 밤", "Fairs & amusement parks"),
+    EV100Scenario("야간 차량 통행", 5.0, "야외 밤", "Night vehicle traffic"),
+    EV100Scenario("투광 조명 건축물", 4.0, "야외 밤", "Floodlit architecture", "3-5"),
+    EV100Scenario("멀리 보이는 불 켜진 건물들", 2.0, "야외 밤", "Distant views of lighted buildings"),
+    EV100Scenario("갤러리", 9.5, "실내", "Galleries", "8-11"),
+    EV100Scenario("무대 쇼/스포츠 이벤트", 8.5, "실내", "Stage shows & Sport Events", "8-9"),
+    EV100Scenario("사무실/작업 공간", 7.5, "실내", "Offices & work areas", "7-8"),
+    EV100Scenario("주거 실내", 6.0, "실내", "Home interiors", "5-7"),
 )
 
 
