@@ -21,7 +21,7 @@ The core EV100 math lives in `maya_ev100_tool.ev100_core` and has no Maya depend
 - Applies the selected EV100 to a Maya/Arnold camera exposure:
 
 ```text
-camera exposure = EV100
+camera exposure = -EV100
 ```
 
 - Stores the calculated values as custom attributes on the selected camera shape:
@@ -121,10 +121,10 @@ UI의 **라이팅 시나리오** 드롭다운은 형님이 첨부한 EV100 표 �
 The tool sets Arnold camera exposure when `aiExposure` exists:
 
 ```text
-aiExposure = EV100
+aiExposure = -EV100
 ```
 
-This is an artist-facing Maya/Arnold exposure mapping: `EV100 12` sets camera `aiExposure` to `+12` stops. Positive camera exposure brightens the render. The shot EV is kept as the global viewing/exposure reference, while Env/Local Light tabs calibrate light brightness against the 0.18 gray cube.
+This is an artist-facing Maya/Arnold exposure mapping: `EV100 12` sets camera `aiExposure` to `-12` stops. Higher EV100 represents a darker photographic/view exposure. Positive exposure compensation or calibration offset values still brighten from that base. The shot EV is kept as the global viewing/exposure reference, while Env/Local Light tabs calibrate light brightness against the 0.18 gray cube.
 
 No exposure compensation or calibration offset is required in the default workflow. If the core still stores offset-related custom attrs, they remain `0` for compatibility.
 
