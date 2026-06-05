@@ -12,6 +12,7 @@ from maya_ev100_tool.ev100_core import (
     default_local_light_rig_settings,
     ev100_from_camera_settings,
     camera_exposure_from_ev100,
+    estimate_exposure_calibration_from_pixel_ev,
     estimate_hdri_ev_calibration,
     local_light_exposure_from_lumens,
     local_light_intensity_from_lumens,
@@ -92,23 +93,31 @@ def test_average_linear_rgb_uses_simple_channel_average():
     assert average_linear_rgb((0.2, 0.4, 0.6)) == pytest_approx(0.4)
 
 
-def test_local_light_presets_are_simple_shot_starters_with_fixed_types():
+def test_local_light_presets_match_korean_reference_table_with_fixed_types():
     presets = {preset.name: preset for preset in LOCAL_LIGHT_PRESETS}
     assert list(presets) == [
-        "촛불 가까이",
-        "책상 스탠드",
-        "방 천장등",
+        "촛불",
+        "등유 램프",
+        "백열전구",
+        "장식등",
+        "LED 전구",
+        "일반 실내등",
+        "작업등",
+        "실내 조명",
+        "할로겐 스팟",
         "차량 헤드라이트",
-        "가로등 느낌",
-        "작은 LED Practical",
+        "형광등/CFL",
+        "외부 조명",
+        "포토 플래시",
+        "가로등",
     ]
-    assert presets["촛불 가까이"].light_type == "Point"
-    assert presets["책상 스탠드"].light_type == "Point"
-    assert presets["방 천장등"].light_type == "Rect"
+    assert presets["백열전구"].lumens == pytest_approx(300.0)
+    assert presets["형광등/CFL"].lumens == pytest_approx(2000.0)
+    assert presets["가로등"].lumens == pytest_approx(60000.0)
+    assert presets["촛불"].kelvin == pytest_approx(1800.0)
+    assert presets["촛불"].light_type == "Point"
+    assert presets["작업등"].light_type == "Rect"
     assert presets["차량 헤드라이트"].light_type == "Spot"
-    assert presets["가로등 느낌"].light_type == "Spot"
-    assert presets["작은 LED Practical"].light_type == "Point"
-    assert presets["촛불 가까이"].kelvin == pytest_approx(1800.0)
 
 
 def test_local_light_lumen_scale_uses_1000_lumen_baseline():
@@ -119,14 +128,14 @@ def test_local_light_lumen_scale_uses_1000_lumen_baseline():
 
 
 def test_default_local_light_rig_settings_give_practical_distance_and_size():
-    candle = default_local_light_rig_settings("촛불 가까이")
+    candle = default_local_light_rig_settings("촛불")
     assert candle.distance_m == pytest_approx(0.5)
     assert candle.source_size_m == pytest_approx(0.03)
     assert candle.recommended_type == "Point"
 
-    ceiling = default_local_light_rig_settings("방 천장등")
-    assert ceiling.distance_m == pytest_approx(1.5)
-    assert ceiling.recommended_type == "Rect"
+    work_light = default_local_light_rig_settings("작업등")
+    assert work_light.distance_m == pytest_approx(1.2)
+    assert work_light.recommended_type == "Rect"
 
     car = default_local_light_rig_settings("차량 헤드라이트")
     assert car.distance_m == pytest_approx(5.0)
@@ -139,6 +148,16 @@ def test_meters_to_scene_units_handles_default_maya_centimeters_at_tool_scale():
     assert meters_to_scene_units(1.0, "m") == pytest_approx(0.1)
     assert meters_to_scene_units(1.0, "ft") == pytest_approx(0.3280839895)
     assert meters_to_scene_units(1.0, "cm", scene_scale=1.0) == pytest_approx(100.0)
+
+
+def test_estimate_exposure_calibration_from_pixel_ev_uses_gray_card_ev_zero_target():
+    bright = estimate_exposure_calibration_from_pixel_ev(pixel_ev=0.702904, current_exposure=1.5)
+    assert bright.correction_stops == pytest_approx(-0.702904)
+    assert bright.recommended_exposure == pytest_approx(0.797096)
+
+    dark = estimate_exposure_calibration_from_pixel_ev(pixel_ev=-1.2, current_exposure=0.5)
+    assert dark.correction_stops == pytest_approx(1.2)
+    assert dark.recommended_exposure == pytest_approx(1.7)
 
 
 def test_estimate_hdri_ev_calibration_darkens_when_gray_renders_too_bright():

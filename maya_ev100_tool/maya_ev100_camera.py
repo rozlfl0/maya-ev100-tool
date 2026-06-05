@@ -25,7 +25,7 @@ from .ev100_core import (
     DirectEV100Settings,
     ExposureSettings,
     default_local_light_rig_settings,
-    estimate_hdri_ev_calibration,
+    estimate_exposure_calibration_from_pixel_ev,
     local_light_exposure_from_lumens,
     local_light_intensity_from_lumens,
     meters_to_scene_units,
@@ -131,43 +131,34 @@ def show() -> None:
     cmds.button(label="그레이 캘리브레이션 큐브 생성 (0.18)", command=lambda *_args: create_calibration_cubes())
 
     cmds.separator(height=8, style="in")
-    cmds.text(label="2) Dome HDRI 캘리브레이션: Dome Light를 선택하고 그레이 큐브 측정 RGB를 넣습니다.", align="left")
+    cmds.text(label="2) Dome HDRI 캘리브레이션: Dome만 켠 상태에서 0.18 그레이 큐브의 Arnold RenderView Pixel Inspector EV를 입력합니다.", align="left")
     calibration_swatch = CALIBRATION_SWATCHES[0]
-    cmds.text(label="타겟 픽셀: %s" % calibration_swatch.label, align="left")
-    hdri_r = cmds.floatFieldGrp(label="측정 R", value1=0.180, numberOfFields=1, precision=4)
-    hdri_g = cmds.floatFieldGrp(label="측정 G", value1=0.180, numberOfFields=1, precision=4)
-    hdri_b = cmds.floatFieldGrp(label="측정 B", value1=0.180, numberOfFields=1, precision=4)
+    cmds.text(label="타겟: %s / 목표 Pixel EV 0" % calibration_swatch.label, align="left")
+    hdri_pixel_ev = cmds.floatFieldGrp(label="Arnold Pixel EV", value1=0.0, numberOfFields=1, precision=4)
     hdri_result = cmds.text(label="Dome 캘리브레이션: -", align="left")
 
     def _analyze_dome_exposure_with_current(current_dome_exposure=None):
         if current_dome_exposure is None:
             dome_node = get_selected_exposure_node()
             current_dome_exposure = cmds.getAttr("%s.exposure" % dome_node)
-        result_data = estimate_hdri_ev_calibration(
-            current_ev100=cmds.floatFieldGrp(ev100, query=True, value1=True),
-            measured_rgb=(
-                cmds.floatFieldGrp(hdri_r, query=True, value1=True),
-                cmds.floatFieldGrp(hdri_g, query=True, value1=True),
-                cmds.floatFieldGrp(hdri_b, query=True, value1=True),
-            ),
-            target_reflectance=calibration_swatch.reflectance,
-            current_dome_exposure=current_dome_exposure,
+        result_data = estimate_exposure_calibration_from_pixel_ev(
+            pixel_ev=cmds.floatFieldGrp(hdri_pixel_ev, query=True, value1=True),
+            current_exposure=current_dome_exposure,
         )
-        direction = "어두움 → 올리기" if result_data.correction_stops > 0.0 else "밝음 → 낮추기"
+        direction = "밝음 → 낮추기" if result_data.correction_stops < 0.0 else "어두움 → 올리기"
         cmds.text(
             hdri_result,
             edit=True,
             label=(
-                "현재 Dome %.3f / 평균 %.3f / 타겟 %.3f\n"
+                "현재 Dome Exposure %.3f / Pixel EV %.3f\n"
                 "보정 %.3f stops (%s) → 추천 Dome Exposure %.3f"
             )
             % (
                 current_dome_exposure,
-                result_data.measured_average,
-                result_data.target_reflectance,
+                result_data.pixel_ev,
                 result_data.correction_stops,
                 direction,
-                result_data.recommended_dome_exposure,
+                result_data.recommended_exposure,
             ),
         )
         return result_data
@@ -179,45 +170,32 @@ def show() -> None:
         dome_node = get_selected_exposure_node()
         current_exposure = cmds.getAttr("%s.exposure" % dome_node)
         result_data = _analyze_dome_exposure_with_current(current_exposure)
-        cmds.setAttr("%s.exposure" % dome_node, result_data.recommended_dome_exposure)
+        cmds.setAttr("%s.exposure" % dome_node, result_data.recommended_exposure)
         cmds.inViewMessage(
-            amg="Applied Dome exposure <hl>%.3f</hl> to %s" % (result_data.recommended_dome_exposure, dome_node),
+            amg="Applied Dome exposure <hl>%.3f</hl> to %s" % (result_data.recommended_exposure, dome_node),
             pos="topCenter",
             fade=True,
         )
 
     cmds.rowLayout(numberOfColumns=2, columnWidth2=(180, 220), adjustableColumn=2)
-    cmds.button(label="선택 Dome Exposure 분석", command=analyze_dome_exposure)
-    cmds.button(label="선택한 Dome Light에 적용", command=apply_dome_exposure_to_selected)
+    cmds.button(label="선택 Dome 분석", command=analyze_dome_exposure)
+    cmds.button(label="선택 Dome에 EV 보정 적용", command=apply_dome_exposure_to_selected)
     cmds.setParent("..")
 
     cmds.separator(height=8, style="in")
     cmds.text(
         label="워크플로우: EV100은 카메라/시나리오 기준, 타겟 픽셀 맞추기는 Dome Light exposure 기준입니다.\n"
-        "Dome Light를 선택한 상태로 분석/적용합니다. 측정 RGB는 0.18 그레이 큐브 면에서 얻은 linear render value여야 합니다. 모션블러 셔터는 건드리지 않습니다.",
+        "0.18 그레이 큐브에서 Arnold Pixel EV가 0이면 기준 노출입니다. EV +0.7은 exposure -0.7, EV -1.2는 exposure +1.2입니다.",
         align="left",
     )
 
     local_tab = cmds.columnLayout(parent=tabs, adjustableColumn=True, rowSpacing=8, columnAttach=("both", 10))
-    cmds.text(label="로컬 라이트: 상황 프리셋을 고르면 타입/루멘/거리/크기를 자동으로 잡고, 선택한 오브젝트 앞에 바로 배치합니다.", align="left")
-    local_preset_menu = cmds.optionMenu(label="상황 프리셋")
+    cmds.text(label="로컬 라이트: 표 기반 프리셋으로 시작점을 만들고, 0.18 그레이 카드의 Arnold Pixel EV로 보정합니다.", align="left")
+    local_preset_menu = cmds.optionMenu(label="로컬라이트 프리셋")
     for preset in LOCAL_LIGHT_PRESETS:
         cmds.menuItem(label=_local_light_preset_label(preset))
-    cmds.frameLayout(label="Advanced: 거리 / 크기 / 물리값", collapsable=True, collapse=True, marginWidth=6, marginHeight=6)
-    local_lumens = cmds.floatFieldGrp(label="루멘", value1=LOCAL_LIGHT_PRESETS[0].lumens, numberOfFields=1, precision=1)
-    local_kelvin = cmds.floatFieldGrp(label="색온도 Kelvin", value1=LOCAL_LIGHT_PRESETS[0].kelvin, numberOfFields=1, precision=0)
-    rect_width = cmds.floatFieldGrp(label="Rect 가로", value1=1.0, numberOfFields=1, precision=3)
-    rect_height = cmds.floatFieldGrp(label="Rect 세로", value1=1.0, numberOfFields=1, precision=3)
-    spot_cone = cmds.floatFieldGrp(label="Spot Cone Angle", value1=45.0, numberOfFields=1, precision=1)
-    rig_distance = cmds.floatFieldGrp(label="타겟까지 거리 m", value1=0.5, numberOfFields=1, precision=3)
-    source_size = cmds.floatFieldGrp(label="소스 크기 m", value1=0.03, numberOfFields=1, precision=3)
-    use_selected_target = cmds.checkBox(label="선택 오브젝트 중심을 타겟으로 사용", value=True)
-    create_gray_card = cmds.checkBox(label="타겟 위치에 0.18 그레이 카드 생성", value=True)
-    cmds.setParent("..")
     local_note = cmds.text(label="", align="left")
-    local_r = cmds.floatFieldGrp(label="측정 R", value1=0.180, numberOfFields=1, precision=4)
-    local_g = cmds.floatFieldGrp(label="측정 G", value1=0.180, numberOfFields=1, precision=4)
-    local_b = cmds.floatFieldGrp(label="측정 B", value1=0.180, numberOfFields=1, precision=4)
+    local_pixel_ev = cmds.floatFieldGrp(label="Arnold Pixel EV", value1=0.0, numberOfFields=1, precision=4)
     local_result = cmds.text(label="Local Light 캘리브레이션: -", align="left")
 
     def _selected_local_preset():
@@ -230,43 +208,29 @@ def show() -> None:
     def load_local_preset(*_args):
         preset = _selected_local_preset()
         rig = default_local_light_rig_settings(preset.name, preset.light_type)
-        cmds.floatFieldGrp(local_lumens, edit=True, value1=preset.lumens)
-        cmds.floatFieldGrp(local_kelvin, edit=True, value1=preset.kelvin)
-        cmds.floatFieldGrp(rig_distance, edit=True, value1=rig.distance_m)
-        cmds.floatFieldGrp(source_size, edit=True, value1=rig.source_size_m)
-        if preset.light_type == "Rect":
-            cmds.floatFieldGrp(rect_width, edit=True, value1=rig.source_size_m)
-            cmds.floatFieldGrp(rect_height, edit=True, value1=rig.source_size_m)
         range_text = " / range %s" % preset.common_range if preset.common_range else ""
-        cmds.text(local_note, edit=True, label="%s [%s] / %.1f lm / %.0fK%s / 거리 %.2fm / 크기 %.2fm - %s" % (preset.name, preset.light_type, preset.lumens, preset.kelvin, range_text, rig.distance_m, rig.source_size_m, rig.note))
-
-    def create_local_light_from_ui(*_args):
-        node = create_local_light(
-            light_type=_selected_local_preset().light_type,
-            lumens=cmds.floatFieldGrp(local_lumens, query=True, value1=True),
-            kelvin=cmds.floatFieldGrp(local_kelvin, query=True, value1=True),
-            rect_width=cmds.floatFieldGrp(rect_width, query=True, value1=True),
-            rect_height=cmds.floatFieldGrp(rect_height, query=True, value1=True),
-            cone_angle=cmds.floatFieldGrp(spot_cone, query=True, value1=True),
-            preset_name=_selected_local_preset().name,
+        cmds.text(
+            local_note,
+            edit=True,
+            label="%s [%s] / %.1f lm / %.0fK%s / 기본 거리 %.2fm / 크기 %.2fm - %s"
+            % (preset.name, preset.light_type, preset.lumens, preset.kelvin, range_text, rig.distance_m, rig.source_size_m, rig.note),
         )
-        cmds.inViewMessage(amg="Created local light <hl>%s</hl>" % node, pos="topCenter", fade=True)
-        return node
 
     def create_local_light_rig_from_ui(*_args):
         preset = _selected_local_preset()
+        rig = default_local_light_rig_settings(preset.name, preset.light_type)
         node = create_local_light_distance_rig(
             light_type=preset.light_type,
-            lumens=cmds.floatFieldGrp(local_lumens, query=True, value1=True),
-            kelvin=cmds.floatFieldGrp(local_kelvin, query=True, value1=True),
-            distance_m=cmds.floatFieldGrp(rig_distance, query=True, value1=True),
-            source_size_m=cmds.floatFieldGrp(source_size, query=True, value1=True),
-            rect_width=cmds.floatFieldGrp(rect_width, query=True, value1=True),
-            rect_height=cmds.floatFieldGrp(rect_height, query=True, value1=True),
-            cone_angle=cmds.floatFieldGrp(spot_cone, query=True, value1=True),
+            lumens=preset.lumens,
+            kelvin=preset.kelvin,
+            distance_m=rig.distance_m,
+            source_size_m=rig.source_size_m,
+            rect_width=rig.source_size_m,
+            rect_height=rig.source_size_m,
+            cone_angle=45.0,
             preset_name=preset.name,
-            use_selected_target=cmds.checkBox(use_selected_target, query=True, value=True),
-            create_gray_card=cmds.checkBox(create_gray_card, query=True, value=True),
+            use_selected_target=True,
+            create_gray_card=True,
         )
         cmds.inViewMessage(amg="선택한 오브젝트 앞에 로컬라이트 생성 <hl>%s</hl>" % node, pos="topCenter", fade=True)
         return node
@@ -274,26 +238,19 @@ def show() -> None:
     def _analyze_local_light_with_current(node=None):
         light_node = node or get_selected_light_control_node()
         current_value, mode = _get_light_calibration_value(light_node)
-        result_data = estimate_hdri_ev_calibration(
-            current_ev100=cmds.floatFieldGrp(ev100, query=True, value1=True),
-            measured_rgb=(
-                cmds.floatFieldGrp(local_r, query=True, value1=True),
-                cmds.floatFieldGrp(local_g, query=True, value1=True),
-                cmds.floatFieldGrp(local_b, query=True, value1=True),
-            ),
-            target_reflectance=calibration_swatch.reflectance,
-            current_dome_exposure=current_value,
+        result_data = estimate_exposure_calibration_from_pixel_ev(
+            pixel_ev=cmds.floatFieldGrp(local_pixel_ev, query=True, value1=True),
+            current_exposure=current_value,
         )
-        direction = "어두움 → 올리기" if result_data.correction_stops > 0.0 else "밝음 → 낮추기"
-        target_value = result_data.recommended_dome_exposure if mode == "exposure" else current_value * (2.0 ** result_data.correction_stops)
+        direction = "밝음 → 낮추기" if result_data.correction_stops < 0.0 else "어두움 → 올리기"
+        target_value = result_data.recommended_exposure if mode == "exposure" else current_value * (2.0 ** result_data.correction_stops)
         label = (
-            "선택 Light %s %.3f / 평균 %.3f / 타겟 %.3f\n"
+            "선택 Light %s %.3f / Pixel EV %.3f\n"
             "보정 %.3f stops (%s) → 추천 %s %.3f"
         ) % (
             mode,
             current_value,
-            result_data.measured_average,
-            result_data.target_reflectance,
+            result_data.pixel_ev,
             result_data.correction_stops,
             direction,
             mode,
@@ -318,9 +275,9 @@ def show() -> None:
     cmds.rowLayout(numberOfColumns=3, columnWidth3=(220, 170, 170), adjustableColumn=1)
     cmds.button(label="선택 오브젝트 앞에 생성", command=create_local_light_rig_from_ui)
     cmds.button(label="선택 Local 분석", command=analyze_local_light)
-    cmds.button(label="선택 Local 적용", command=apply_local_light)
+    cmds.button(label="선택 Local에 EV 보정 적용", command=apply_local_light)
     cmds.setParent("..")
-    cmds.text(label="기본은 프리셋만 고르고 버튼을 누르면 됩니다. 거리/크기/루멘은 Advanced에서만 필요할 때 조절하고, 최종 밝기는 그레이 측정으로 보정합니다.", align="left")
+    cmds.text(label="Dome을 먼저 맞춘 뒤 Local을 켜고, Local이 닿는 0.18 그레이 카드의 Arnold Pixel EV를 입력해 보정합니다.", align="left")
 
     cmds.tabLayout(tabs, edit=True, tabLabel=((env_tab, "Env Light"), (local_tab, "Local Light")))
     cmds.showWindow(window)

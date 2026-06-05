@@ -148,20 +148,21 @@ Workflow:
 
 1. Apply the EV100 scenario to the camera.
 2. Load the HDRI into the Dome/SkyDome Light.
-3. Keep Dome `exposure` at `0` for the first test.
-4. Render the gray calibration cube.
-5. Sample the lit gray cube face in **linear RGB**.
+3. Turn local lights off while calibrating Dome/HDRI.
+4. Render the 0.18 gray calibration cube.
+5. In Arnold RenderView Pixel Inspector, read the gray cube face **EV** value.
 6. Select the Arnold dome light transform or shape.
-7. Enter sampled `R`, `G`, and `B`.
-8. Click **선택 Dome Exposure 분석** or **선택한 Dome Light에 적용**.
+7. Enter the Pixel Inspector `EV` value.
+8. Click **선택 Dome 분석** or **선택 Dome에 EV 보정 적용**.
 
 The calculation is:
 
 ```text
-measured_average = (R + G + B) / 3
-correction_stops = log2(target_reflectance / measured_average)
+correction_stops = -pixel_ev
 recommended_dome_exposure = current_dome_exposure + correction_stops
 ```
+
+For a 0.18 gray card, Arnold Pixel Inspector `EV ≈ 0` means the gray reference is correctly exposed. `EV +0.7` means it is 0.7 stops bright, so lower Dome exposure by 0.7. `EV -1.2` means it is 1.2 stops dark, so raise Dome exposure by 1.2.
 
 The UI reads `current_dome_exposure` directly from the selected Dome Light `exposure` attribute. You do not need to type the current exposure manually.
 
@@ -170,44 +171,52 @@ Example:
 ```text
 Target: Middle Gray 0.18
 Current Dome Exposure: 0
-Measured RGB: 0.247 / 0.246 / 0.268
-Average: 0.254
+Arnold Pixel EV: +0.70
 
-correction_stops ≈ -0.49
-recommended_dome_exposure ≈ -0.49
+correction_stops = -0.70
+recommended_dome_exposure = -0.70
 ```
 
-Meaning: the HDRI/Dome is about half a stop too bright for the chosen EV100 camera setup, so lower the Dome Light exposure by about `-0.5` stop.
+Meaning: the HDRI/Dome is about 0.7 stops too bright for the chosen EV100 camera setup, so lower the Dome Light exposure by `-0.7` stop.
 
-To apply automatically, select the Arnold dome light transform or shape and click **선택한 Dome Light에 적용**. The selected node or its shape must have an `exposure` attribute.
+To apply automatically, select the Arnold dome light transform or shape and click **선택 Dome에 EV 보정 적용**. The selected node or its shape must have an `exposure` attribute.
 
 ## Local Light Tab
 
-Use this tab for fast practical/local light starters. The default workflow is now intentionally simple: choose a situation preset, select a subject/object, then click **선택 오브젝트 앞에 생성**. Distance, source size, lumen, and Kelvin controls are hidden under **Advanced** for when you actually need them.
+Use this tab for practical/local light starting points from the reference table. The UI intentionally does **not** expose advanced distance/size/lumen controls now: choose a preset, select a subject/object, then click **선택 오브젝트 앞에 생성**. Final brightness calibration uses Arnold Pixel Inspector EV on the generated 0.18 gray card.
 
-Current situation presets. Each preset has a fixed light type, so there is no separate Rect / Point / Spot selector in the UI:
+Current Korean local-light presets. Each preset has a fixed light type, so there is no separate Rect / Point / Spot selector in the UI:
 
 ```text
-[Point] 촛불 가까이          13 lm     1800K
-[Point] 책상 스탠드          500 lm    2700K
-[Rect]  방 천장등            1000 lm   4000K
-[Spot]  차량 헤드라이트      1500 lm   4300K
-[Spot]  가로등 느낌          60000 lm  2200K
-[Point] 작은 LED Practical   400 lm    5600K
+[Point] 촛불             13 lm     1800K
+[Point] 등유 램프        50 lm     1900K
+[Point] 백열전구         300 lm    2700K
+[Point] 장식등           300 lm    2700K
+[Point] LED 전구         400 lm    5600K
+[Rect]  일반 실내등      435 lm    4000K
+[Rect]  작업등           1000 lm   4000K
+[Rect]  실내 조명        1000 lm   3200K
+[Spot]  할로겐 스팟      1500 lm   3200K
+[Spot]  차량 헤드라이트  1500 lm   4300K
+[Rect]  형광등/CFL       2000 lm   4000K
+[Spot]  외부 조명        10000 lm  5600K
+[Point] 포토 플래시      20000 lm  5600K
+[Spot]  가로등           60000 lm  2200K
 ```
 
 Workflow:
 
 ```text
 1. Keep the camera EV100 as the shot-wide physical exposure reference.
-2. Open Local Light tab.
-3. Choose a situation preset.
-4. Select a subject/object.
-5. Click 선택 오브젝트 앞에 생성.
-6. If the result needs art direction, open Advanced and adjust distance/source size/lumen/Kelvin.
-7. Render the generated 0.18 gray card under that local light.
-8. Enter sampled linear RGB.
-9. Select the local light and click 선택 Local 분석 or 선택 Local 적용.
+2. Calibrate Dome/HDRI first with local lights off.
+3. Open Local Light tab.
+4. Choose a local-light preset.
+5. Select a subject/object.
+6. Click 선택 오브젝트 앞에 생성.
+7. Turn on/solo the local light contribution you want to judge.
+8. Render the generated 0.18 gray card under that local light.
+9. Enter Arnold RenderView Pixel Inspector `EV`.
+10. Select the local light and click 선택 Local 분석 or 선택 Local에 EV 보정 적용.
 ```
 
 `선택 오브젝트 앞에 생성` creates:
@@ -225,12 +234,20 @@ The light is placed at the requested meter distance from the target and aimed to
 Default distance/source-size starting points:
 
 ```text
-촛불 가까이          Point  0.5m  / 0.03m source
-책상 스탠드          Point  1.0m  / 0.12m source
-방 천장등            Rect   1.5m  / 0.8m source
-차량 헤드라이트      Spot   5.0m  / 0.18m source
-가로등 느낌          Spot   8.0m  / 0.6m source
-작은 LED Practical   Point  1.0m  / 0.08m source
+촛불             Point  0.5m  / 0.03m source
+등유 램프        Point  0.8m  / 0.12m source
+백열전구         Point  1.0m  / 0.08m source
+장식등           Point  1.0m  / 0.15m source
+LED 전구         Point  1.0m  / 0.08m source
+일반 실내등      Rect   2.0m  / 0.6m source
+작업등           Rect   1.2m  / 0.4m source
+실내 조명        Rect   1.5m  / 0.5m source
+할로겐 스팟      Spot   2.0m  / 0.12m source
+차량 헤드라이트  Spot   5.0m  / 0.18m source
+형광등/CFL       Rect   2.0m  / 1.2m source
+외부 조명        Spot   4.0m  / 0.5m source
+포토 플래시      Point  2.0m  / 0.12m source
+가로등           Spot   8.0m  / 0.6m source
 ```
 
 The lumen value is used as a practical starting scale:
@@ -246,10 +263,10 @@ Maya Point/Spot fallback with intensity only:
 500 lm  -> intensity 50000
 ```
 
-This is intentionally an artist-safe initial scale, not a claim that every Maya/Arnold light type interprets `intensity` as true lumens. Maya default Point/Spot `intensity` needs a much larger practical fallback scale under EV100 camera exposure, so the tool uses `intensity = lumens * 100` when no `exposure` attribute exists. The final reliable step is the same gray-pixel calibration:
+This is intentionally an artist-safe initial scale, not a claim that every Maya/Arnold light type interprets `intensity` as true lumens. Maya default Point/Spot `intensity` needs a much larger practical fallback scale under EV100 camera exposure, so the tool uses `intensity = lumens * 100` when no `exposure` attribute exists. The final reliable step is the same 0.18 gray-card Pixel EV calibration:
 
 ```text
-correction_stops = log2(0.18 / measured_average)
+correction_stops = -pixel_ev
 new exposure = current exposure + correction_stops
 ```
 
