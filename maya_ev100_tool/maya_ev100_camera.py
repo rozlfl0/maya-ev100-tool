@@ -17,7 +17,7 @@ MVP behavior:
 
 from __future__ import annotations
 
-from .ev100_core import DirectEV100Settings, ExposureSettings, parse_shutter
+from .ev100_core import CALIBRATION_SWATCHES, DirectEV100Settings, ExposureSettings, parse_shutter
 
 try:
     from maya import cmds
@@ -85,6 +85,9 @@ def show() -> None:
     cmds.setParent("..")
 
     cmds.separator(height=8, style="in")
+    cmds.button(label="Create Calibration Cubes (0.71 / 0.18 / 0.031)", command=lambda *_args: create_calibration_cubes())
+
+    cmds.separator(height=8, style="in")
     cmds.text(
         label="Note: recommended exposure = -EV100 + exposure comp + calibration offset.\n"
         "EV100 is exposure metadata only; this tool does not change motion-blur shutter settings.\n"
@@ -94,6 +97,77 @@ def show() -> None:
 
     cmds.showWindow(window)
     calculate_only()
+
+
+def create_calibration_cubes(size: float = 1.0, spacing: float = 1.4) -> str:
+    """Create neutral reflectance cubes for PBL exposure calibration.
+
+    The cubes use Lambert materials with linear RGB reflectance values:
+    0.71 white paper, 0.18 middle gray, and 0.031 charcoal.
+    They are intended for render/pixel-inspector calibration, not beauty shading.
+    """
+    _require_maya()
+    group = cmds.group(empty=True, name="PBL_Calibration_Cubes_GRP")
+
+    start_x = -spacing * (len(CALIBRATION_SWATCHES) - 1) / 2.0
+    for index, swatch in enumerate(CALIBRATION_SWATCHES):
+        cube = cmds.polyCube(name="PBL_%s_cube" % swatch.name, width=size, height=size, depth=size)[0]
+        cmds.setAttr("%s.translateX" % cube, start_x + spacing * index)
+        cmds.setAttr("%s.translateY" % cube, size / 2.0)
+        cmds.parent(cube, group)
+
+        shader = _create_lambert_reflectance_shader(swatch.name, swatch.rgb)
+        cmds.select(cube, replace=True)
+        cmds.hyperShade(assign=shader)
+
+        shape = (cmds.listRelatives(cube, shapes=True, fullPath=True) or [cube])[0]
+        _set_or_add_double_attr(shape, "pbl_reflectance", swatch.reflectance)
+        _set_or_add_double_attr(cube, "pbl_reflectance", swatch.reflectance)
+
+        label = _create_text_label(swatch.label, cube, y_offset=size * 1.15)
+        if label:
+            cmds.parent(label, group)
+
+    cmds.select(group, replace=True)
+    cmds.inViewMessage(
+        amg="Created <hl>PBL calibration cubes</hl>: 0.71 / 0.18 / 0.031",
+        pos="topCenter",
+        fade=True,
+    )
+    return group
+
+
+def _create_lambert_reflectance_shader(name: str, rgb: tuple[float, float, float]) -> str:
+    shader = cmds.shadingNode("lambert", asShader=True, name="PBL_%s_lambert" % name)
+    shading_group = cmds.sets(renderable=True, noSurfaceShader=True, empty=True, name="%sSG" % shader)
+    cmds.connectAttr("%s.outColor" % shader, "%s.surfaceShader" % shading_group, force=True)
+    cmds.setAttr("%s.color" % shader, rgb[0], rgb[1], rgb[2], type="double3")
+    cmds.setAttr("%s.diffuse" % shader, 1.0)
+    _set_or_add_double_attr(shader, "pbl_reflectance", rgb[0])
+    return shader
+
+
+def _create_text_label(text: str, target: str, y_offset: float) -> str | None:
+    try:
+        label = cmds.textCurves(name="PBL_%s_label" % target, text=text, font="Arial", constructionHistory=False)[0]
+    except Exception:
+        return None
+
+    bbox = cmds.exactWorldBoundingBox(label)
+    label_width = bbox[3] - bbox[0]
+    cmds.setAttr("%s.scaleX" % label, 0.12)
+    cmds.setAttr("%s.scaleY" % label, 0.12)
+    cmds.setAttr("%s.scaleZ" % label, 0.12)
+    cmds.setAttr("%s.translateX" % label, cmds.getAttr("%s.translateX" % target) - label_width * 0.06)
+    cmds.setAttr("%s.translateY" % label, y_offset)
+    cmds.setAttr("%s.translateZ" % label, 0.65)
+    return label
+
+
+def _set_or_add_double_attr(node: str, attr: str, value: float) -> None:
+    if not cmds.attributeQuery(attr, node=node, exists=True):
+        cmds.addAttr(node, longName=attr, attributeType="double", keyable=True)
+    cmds.setAttr("%s.%s" % (node, attr), float(value))
 
 
 def apply_settings_to_camera(camera_shape: str, settings: DirectEV100Settings | ExposureSettings) -> None:

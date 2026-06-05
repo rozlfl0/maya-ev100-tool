@@ -20,6 +20,7 @@ camera exposure = -EV100 + exposure compensation + calibration offset
   - `pbl_calibration_offset`
   - `pbl_recommended_camera_exposure`
 - Applies the recommendation to Arnold `aiExposure` when that attribute exists on the camera shape.
+- Creates calibration cubes with neutral diffuse reflectance values `0.71`, `0.18`, and `0.031` for pixel-inspector/light-meter workflows.
 - Does **not** change Maya/Arnold motion-blur shutter, shutter angle, shutter open/close, or render motion-blur settings.
 
 ## Why Direct EV100?
@@ -74,6 +75,32 @@ EV100 8 : bright office / studio interior
 EV100 5 : dim interior
 EV100 2 : night street / low light
 ```
+
+## Calibration Cubes
+
+Click **Create Calibration Cubes (0.71 / 0.18 / 0.031)** to create a grouped three-cube calibration target:
+
+```text
+White Paper : 0.71
+Middle Gray : 0.18
+Charcoal    : 0.031
+```
+
+Each cube receives a neutral Lambert material whose linear RGB values match the target reflectance. The cube transform, shape, and shader also store `pbl_reflectance` metadata.
+
+Suggested workflow:
+
+1. Set the camera EV100 value for the lighting condition, for example `EV100 15` for bright noon daylight.
+2. Place the calibration cubes where you want to measure the light response.
+3. Render with your normal Maya/Arnold/OCIO setup.
+4. Use a pixel inspector or sampled render value on the lit face of each cube.
+5. Average linear RGB roughly as `(R + G + B) / 3`.
+6. Adjust exposure/calibration until the sampled values are near the cube references:
+   - bright/lit reference: `0.71`
+   - middle gray: `0.18`
+   - dark/shadow reference: `0.031`
+
+This mirrors the Unreal calibration note: find the value where white paper does not clip and charcoal does not crush, then use the resulting EV/calibration range as the shot or environment baseline.
 
 ## Test Outside Maya
 

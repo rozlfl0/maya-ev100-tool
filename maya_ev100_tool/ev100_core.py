@@ -13,6 +13,49 @@ MIDDLE_GRAY_LINEAR = 0.18
 
 
 @dataclass(frozen=True)
+class CalibrationSwatch:
+    """Neutral reflectance target for exposure/light calibration."""
+
+    name: str
+    label: str
+    reflectance: float
+    description: str
+
+    @property
+    def rgb(self) -> tuple[float, float, float]:
+        return (self.reflectance, self.reflectance, self.reflectance)
+
+
+CALIBRATION_SWATCHES = (
+    CalibrationSwatch(
+        name="white_paper",
+        label="White Paper 0.71",
+        reflectance=0.71,
+        description="Bright diffuse reference; should not clip when calibrating highlights.",
+    ),
+    CalibrationSwatch(
+        name="middle_gray",
+        label="Middle Gray 0.18",
+        reflectance=0.18,
+        description="18% middle-gray reference for neutral exposure checks.",
+    ),
+    CalibrationSwatch(
+        name="charcoal",
+        label="Charcoal 0.031",
+        reflectance=0.031,
+        description="Dark diffuse reference for shadow/min EV calibration.",
+    ),
+)
+
+
+def calibration_swatch_by_name(name: str) -> CalibrationSwatch:
+    for swatch in CALIBRATION_SWATCHES:
+        if swatch.name == name:
+            return swatch
+    raise KeyError(f"Unknown calibration swatch: {name!r}")
+
+
+@dataclass(frozen=True)
 class DirectEV100Settings:
     """Direct EV100 settings for artist-friendly camera exposure control.
 

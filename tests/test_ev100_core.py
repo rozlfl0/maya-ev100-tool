@@ -1,8 +1,10 @@
 import math
 
 from maya_ev100_tool.ev100_core import (
-    ExposureSettings,
+    CALIBRATION_SWATCHES,
     DirectEV100Settings,
+    ExposureSettings,
+    calibration_swatch_by_name,
     ev100_from_camera_settings,
     camera_exposure_from_ev100,
     parse_shutter,
@@ -52,6 +54,20 @@ def test_direct_ev100_settings_apply_compensation_and_calibration():
 def test_exposure_settings_keep_legacy_physical_camera_calculation():
     settings = ExposureSettings(fstop=16.0, shutter_seconds=1 / 125.0, iso=100.0)
     assert settings.ev100 == pytest_approx(14.966, abs=0.001)
+
+
+def test_calibration_swatches_match_reference_reflectance_values():
+    assert [swatch.name for swatch in CALIBRATION_SWATCHES] == [
+        "white_paper",
+        "middle_gray",
+        "charcoal",
+    ]
+    assert [swatch.reflectance for swatch in CALIBRATION_SWATCHES] == pytest_approx([0.71, 0.18, 0.031])
+
+
+def test_calibration_swatch_rgb_is_neutral_reflectance_triplet():
+    white = calibration_swatch_by_name("white_paper")
+    assert white.rgb == pytest_approx((0.71, 0.71, 0.71))
 
 
 def pytest_approx(value, **kwargs):
