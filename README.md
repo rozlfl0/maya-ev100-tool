@@ -6,6 +6,13 @@ A small Maya/Arnold helper for a physically based lighting workflow:
 Choose lighting scenario EV100 -> apply to camera -> calibrate HDRI Dome Light exposure with target pixels
 ```
 
+The UI is split into two tabs:
+
+```text
+Env Light   -> camera EV100 + HDRI/Dome exposure calibration
+Local Light -> lumen-preset Rect / Point / Spot light creation and gray-card calibration
+```
+
 The core EV100 math lives in `maya_ev100_tool.ev100_core` and has no Maya dependency, so it can be tested outside Maya. The Maya UI and camera/light attribute updates live in `maya_ev100_tool.maya_ev100_camera`.
 
 ## What It Does
@@ -27,6 +34,8 @@ camera exposure = -EV100
 - Creates a neutral `0.18` middle-gray calibration cube for pixel-inspector/light-meter workflows.
 - Analyzes sampled target RGB values and recommends how much to raise/lower Arnold Dome Light `exposure`.
 - Reads the selected dome light/shape's current `exposure` and applies the correction as `current exposure + correction`.
+- Creates local Rect / Point / Spot lights from real-world lumen presets and color-temperature starting points.
+- Calibrates selected local lights from a `0.18` gray cube by adjusting `exposure` when available, or `intensity` as a fallback.
 - Does **not** change Maya/Arnold motion-blur shutter, shutter angle, shutter open/close, or render motion-blur settings.
 
 ## Physical Workflow
@@ -169,6 +178,60 @@ recommended_dome_exposure ≈ -0.49
 Meaning: the HDRI/Dome is about half a stop too bright for the chosen EV100 camera setup, so lower the Dome Light exposure by about `-0.5` stop.
 
 To apply automatically, select the Arnold dome light transform or shape and click **선택한 Dome Light에 적용**. The selected node or its shape must have an `exposure` attribute.
+
+## Local Light Tab
+
+Use this tab for practical/local sources such as bulbs, fluorescent tubes, LEDs, headlights, street lights, and other set lights.
+
+Current lumen presets from the reference table:
+
+```text
+Candle              13 lm     1800K
+Kerosene            50 lm     1900K
+Incandescent        300 lm    2700K
+Decorative Light    300 lm    2700K
+LED                 400 lm    5600K
+General Lighting    435 lm    4000K
+Functional Lighting 1000 lm   4000K
+Interior Light      1000 lm   3200K
+Halogen             1500 lm   3200K
+Car Headlights      1500 lm   4300K
+Fluorescent & CFL   2000 lm   4000K
+Exterior Light      10000 lm  5600K
+Photo Flash         20000 lm  5600K
+Street Lights       60000 lm  2200K
+```
+
+Workflow:
+
+```text
+1. Keep the camera EV100 as the shot-wide physical exposure reference.
+2. Open Local Light tab.
+3. Choose a lumen preset.
+4. Choose Rect / Point / Spot.
+5. Set Rect size or Spot cone angle when needed.
+6. Click Local Light 생성.
+7. Render the 0.18 gray cube under that local light.
+8. Enter sampled linear RGB.
+9. Select the local light and click 선택 Local 분석 or 선택 Local 적용.
+```
+
+The lumen value is used as a practical starting scale:
+
+```text
+1000 lm -> exposure 0
+2000 lm -> exposure +1
+500 lm  -> exposure -1
+```
+
+This is intentionally an artist-safe initial scale, not a claim that every Maya/Arnold light type interprets `intensity` as true lumens. The final reliable step is the same gray-pixel calibration:
+
+```text
+correction_stops = log2(0.18 / measured_average)
+new exposure = current exposure + correction_stops
+```
+
+If the selected local light has no `exposure` attribute, the tool falls back to multiplying `intensity` by `2 ** correction_stops`.
 
 ## Test Outside Maya
 

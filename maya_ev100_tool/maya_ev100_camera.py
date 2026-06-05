@@ -21,9 +21,12 @@ from .ev100_core import (
     CALIBRATION_CUBE_ROTATE_X_DEGREES,
     CALIBRATION_SWATCHES,
     EV100_SCENARIOS,
+    LOCAL_LIGHT_PRESETS,
     DirectEV100Settings,
     ExposureSettings,
     estimate_hdri_ev_calibration,
+    local_light_exposure_from_lumens,
+    local_light_intensity_from_lumens,
     parse_shutter,
 )
 
@@ -60,7 +63,9 @@ def show() -> None:
         cmds.deleteUI(WINDOW_NAME)
 
     window = cmds.window(WINDOW_NAME, title="Physical EV100 Lighting Toolkit", sizeable=False)
-    cmds.columnLayout(adjustableColumn=True, rowSpacing=8, columnAttach=("both", 10))
+    root = cmds.columnLayout(adjustableColumn=True, rowSpacing=8, columnAttach=("both", 10))
+    tabs = cmds.tabLayout(parent=root, innerMarginWidth=8, innerMarginHeight=8)
+    env_tab = cmds.columnLayout(parent=tabs, adjustableColumn=True, rowSpacing=8, columnAttach=("both", 10))
 
     cmds.text(label="1) 라이팅 시나리오 EV100을 고른 뒤 선택한 카메라에 적용합니다.", align="left")
     scenario_menu = cmds.optionMenu(label="라이팅 시나리오")
@@ -191,8 +196,107 @@ def show() -> None:
         align="left",
     )
 
+    local_tab = cmds.columnLayout(parent=tabs, adjustableColumn=True, rowSpacing=8, columnAttach=("both", 10))
+    cmds.text(label="로컬 라이트: 루멘 프리셋으로 Rect / Point / Spot 라이트를 만들고 그레이 픽셀값으로 보정합니다.", align="left")
+    local_preset_menu = cmds.optionMenu(label="라이트 프리셋")
+    for preset in LOCAL_LIGHT_PRESETS:
+        cmds.menuItem(label=_local_light_preset_label(preset))
+    local_type_menu = cmds.optionMenu(label="라이트 타입")
+    for light_type in ("Rect", "Point", "Spot"):
+        cmds.menuItem(label=light_type)
+    local_lumens = cmds.floatFieldGrp(label="루멘", value1=LOCAL_LIGHT_PRESETS[0].lumens, numberOfFields=1, precision=1)
+    local_kelvin = cmds.floatFieldGrp(label="색온도 Kelvin", value1=LOCAL_LIGHT_PRESETS[0].kelvin, numberOfFields=1, precision=0)
+    rect_width = cmds.floatFieldGrp(label="Rect 가로", value1=1.0, numberOfFields=1, precision=3)
+    rect_height = cmds.floatFieldGrp(label="Rect 세로", value1=1.0, numberOfFields=1, precision=3)
+    spot_cone = cmds.floatFieldGrp(label="Spot Cone Angle", value1=45.0, numberOfFields=1, precision=1)
+    local_note = cmds.text(label="", align="left")
+    local_r = cmds.floatFieldGrp(label="측정 R", value1=0.180, numberOfFields=1, precision=4)
+    local_g = cmds.floatFieldGrp(label="측정 G", value1=0.180, numberOfFields=1, precision=4)
+    local_b = cmds.floatFieldGrp(label="측정 B", value1=0.180, numberOfFields=1, precision=4)
+    local_result = cmds.text(label="Local Light 캘리브레이션: -", align="left")
+
+    def _selected_local_preset():
+        selected_label = cmds.optionMenu(local_preset_menu, query=True, value=True)
+        for preset in LOCAL_LIGHT_PRESETS:
+            if _local_light_preset_label(preset) == selected_label:
+                return preset
+        raise RuntimeError("Unknown local light preset: %s" % selected_label)
+
+    def load_local_preset(*_args):
+        preset = _selected_local_preset()
+        cmds.floatFieldGrp(local_lumens, edit=True, value1=preset.lumens)
+        cmds.floatFieldGrp(local_kelvin, edit=True, value1=preset.kelvin)
+        range_text = " / range %s" % preset.common_range if preset.common_range else ""
+        cmds.text(local_note, edit=True, label="%s / %.1f lm / %.0fK%s" % (preset.name, preset.lumens, preset.kelvin, range_text))
+
+    def create_local_light_from_ui(*_args):
+        node = create_local_light(
+            light_type=cmds.optionMenu(local_type_menu, query=True, value=True),
+            lumens=cmds.floatFieldGrp(local_lumens, query=True, value1=True),
+            kelvin=cmds.floatFieldGrp(local_kelvin, query=True, value1=True),
+            rect_width=cmds.floatFieldGrp(rect_width, query=True, value1=True),
+            rect_height=cmds.floatFieldGrp(rect_height, query=True, value1=True),
+            cone_angle=cmds.floatFieldGrp(spot_cone, query=True, value1=True),
+            preset_name=_selected_local_preset().name,
+        )
+        cmds.inViewMessage(amg="Created local light <hl>%s</hl>" % node, pos="topCenter", fade=True)
+        return node
+
+    def _analyze_local_light_with_current(node=None):
+        light_node = node or get_selected_light_control_node()
+        current_value, mode = _get_light_calibration_value(light_node)
+        result_data = estimate_hdri_ev_calibration(
+            current_ev100=cmds.floatFieldGrp(ev100, query=True, value1=True),
+            measured_rgb=(
+                cmds.floatFieldGrp(local_r, query=True, value1=True),
+                cmds.floatFieldGrp(local_g, query=True, value1=True),
+                cmds.floatFieldGrp(local_b, query=True, value1=True),
+            ),
+            target_reflectance=calibration_swatch.reflectance,
+            current_dome_exposure=current_value,
+        )
+        direction = "어두움 → 올리기" if result_data.correction_stops > 0.0 else "밝음 → 낮추기"
+        target_value = result_data.recommended_dome_exposure if mode == "exposure" else current_value * (2.0 ** result_data.correction_stops)
+        label = (
+            "선택 Light %s %.3f / 평균 %.3f / 타겟 %.3f\n"
+            "보정 %.3f stops (%s) → 추천 %s %.3f"
+        ) % (
+            mode,
+            current_value,
+            result_data.measured_average,
+            result_data.target_reflectance,
+            result_data.correction_stops,
+            direction,
+            mode,
+            target_value,
+        )
+        cmds.text(local_result, edit=True, label=label)
+        return light_node, mode, target_value, result_data
+
+    def analyze_local_light(*_args):
+        return _analyze_local_light_with_current()
+
+    def apply_local_light(*_args):
+        light_node, mode, target_value, result_data = _analyze_local_light_with_current()
+        if mode == "exposure":
+            cmds.setAttr("%s.exposure" % light_node, target_value)
+        else:
+            cmds.setAttr("%s.intensity" % light_node, target_value)
+        cmds.inViewMessage(amg="Applied %s <hl>%.3f</hl> to %s" % (mode, target_value, light_node), pos="topCenter", fade=True)
+        return result_data
+
+    cmds.optionMenu(local_preset_menu, edit=True, changeCommand=load_local_preset)
+    cmds.rowLayout(numberOfColumns=3, columnWidth3=(150, 170, 170), adjustableColumn=3)
+    cmds.button(label="Local Light 생성", command=create_local_light_from_ui)
+    cmds.button(label="선택 Local 분석", command=analyze_local_light)
+    cmds.button(label="선택 Local 적용", command=apply_local_light)
+    cmds.setParent("..")
+    cmds.text(label="루멘은 초기 스케일 기준값입니다. 최종값은 0.18 그레이 큐브 측정으로 선택 라이트 exposure/intensity에 보정 적용합니다.", align="left")
+
+    cmds.tabLayout(tabs, edit=True, tabLabel=((env_tab, "Env Light"), (local_tab, "Local Light")))
     cmds.showWindow(window)
     load_scenario()
+    load_local_preset()
 
 
 def create_calibration_cubes(size: float = 1.0, spacing: float = 1.4) -> str:
@@ -258,6 +362,130 @@ def _create_text_label(text: str, target: str, y_offset: float) -> str | None:
     cmds.setAttr("%s.translateY" % label, y_offset)
     cmds.setAttr("%s.translateZ" % label, 0.65)
     return label
+
+
+def _local_light_preset_label(preset) -> str:
+    range_text = " / %s" % preset.common_range if preset.common_range else ""
+    return "%s / %.0f lm / %.0fK%s" % (preset.name, preset.lumens, preset.kelvin, range_text)
+
+
+def create_local_light(
+    light_type: str,
+    lumens: float,
+    kelvin: float,
+    rect_width: float = 1.0,
+    rect_height: float = 1.0,
+    cone_angle: float = 45.0,
+    preset_name: str = "Local Light",
+) -> str:
+    """Create a practical local light with lumen metadata and a useful starting scale."""
+    _require_maya()
+    safe_name = "PBL_%s_%s" % (preset_name.replace(" ", "_"), light_type)
+    light_type = light_type.lower()
+    if light_type == "rect":
+        try:
+            node = cmds.shadingNode("aiAreaLight", asLight=True, name=safe_name)
+        except Exception:
+            node = cmds.shadingNode("areaLight", asLight=True, name=safe_name)
+        _set_rect_light_size(node, rect_width, rect_height)
+    elif light_type == "spot":
+        node = cmds.spotLight(name=safe_name)
+        if cmds.attributeQuery("coneAngle", node=node, exists=True):
+            cmds.setAttr("%s.coneAngle" % node, float(cone_angle))
+    elif light_type == "point":
+        node = cmds.pointLight(name=safe_name)
+    else:
+        raise ValueError("Unsupported local light type: %s" % light_type)
+
+    control_node = get_light_control_node(node)
+    _apply_light_color_temperature(control_node, kelvin)
+    _set_initial_local_light_scale(control_node, lumens)
+    _set_or_add_double_attr(control_node, "pbl_lumens", lumens)
+    _set_or_add_double_attr(control_node, "pbl_kelvin", kelvin)
+    _set_or_add_double_attr(control_node, "pbl_lumen_exposure", local_light_exposure_from_lumens(lumens))
+    cmds.select(control_node, replace=True)
+    return control_node
+
+
+def _set_rect_light_size(node: str, width: float, height: float) -> None:
+    transform = _transform_for_node(node)
+    if cmds.attributeQuery("width", node=node, exists=True):
+        cmds.setAttr("%s.width" % node, float(width))
+    if cmds.attributeQuery("height", node=node, exists=True):
+        cmds.setAttr("%s.height" % node, float(height))
+    if transform:
+        cmds.setAttr("%s.scaleX" % transform, float(width))
+        cmds.setAttr("%s.scaleY" % transform, float(height))
+
+
+def _set_initial_local_light_scale(node: str, lumens: float) -> None:
+    if cmds.attributeQuery("exposure", node=node, exists=True):
+        cmds.setAttr("%s.exposure" % node, local_light_exposure_from_lumens(lumens))
+        if cmds.attributeQuery("intensity", node=node, exists=True):
+            cmds.setAttr("%s.intensity" % node, 1.0)
+    elif cmds.attributeQuery("intensity", node=node, exists=True):
+        cmds.setAttr("%s.intensity" % node, local_light_intensity_from_lumens(lumens))
+
+
+def _apply_light_color_temperature(node: str, kelvin: float) -> None:
+    rgb = _kelvin_to_rgb(kelvin)
+    if cmds.attributeQuery("color", node=node, exists=True):
+        cmds.setAttr("%s.color" % node, rgb[0], rgb[1], rgb[2], type="double3")
+    if cmds.attributeQuery("aiColorTemperature", node=node, exists=True):
+        cmds.setAttr("%s.aiColorTemperature" % node, float(kelvin))
+    if cmds.attributeQuery("aiUseColorTemperature", node=node, exists=True):
+        cmds.setAttr("%s.aiUseColorTemperature" % node, 1)
+
+
+def _kelvin_to_rgb(kelvin: float) -> tuple[float, float, float]:
+    """Approximate Kelvin to RGB for light color fallback."""
+    import math
+
+    temperature = max(1000.0, min(40000.0, float(kelvin))) / 100.0
+    if temperature <= 66.0:
+        red = 255.0
+        green = 99.4708025861 * math.log(temperature) - 161.1195681661
+        blue = 0.0 if temperature <= 19.0 else 138.5177312231 * math.log(temperature - 10.0) - 305.0447927307
+    else:
+        red = 329.698727446 * ((temperature - 60.0) ** -0.1332047592)
+        green = 288.1221695283 * ((temperature - 60.0) ** -0.0755148492)
+        blue = 255.0
+    return tuple(max(0.0, min(1.0, channel / 255.0)) for channel in (red, green, blue))
+
+
+def get_light_control_node(node: str) -> str:
+    candidates = [node]
+    candidates.extend(cmds.listRelatives(node, shapes=True, fullPath=True) or [])
+    parent = (cmds.listRelatives(node, parent=True, fullPath=True) or [None])[0]
+    if parent:
+        candidates.append(parent)
+    for candidate in candidates:
+        if candidate and (cmds.attributeQuery("exposure", node=candidate, exists=True) or cmds.attributeQuery("intensity", node=candidate, exists=True)):
+            return candidate
+    return node
+
+
+def get_selected_light_control_node() -> str:
+    _require_maya()
+    selection = cmds.ls(selection=True, long=True) or []
+    if not selection:
+        raise RuntimeError("Select a local light transform or shape first.")
+    return get_light_control_node(selection[0])
+
+
+def _get_light_calibration_value(node: str) -> tuple[float, str]:
+    if cmds.attributeQuery("exposure", node=node, exists=True):
+        return float(cmds.getAttr("%s.exposure" % node)), "exposure"
+    if cmds.attributeQuery("intensity", node=node, exists=True):
+        return float(cmds.getAttr("%s.intensity" % node)), "intensity"
+    raise RuntimeError("Selected light has no exposure or intensity attribute: %s" % node)
+
+
+def _transform_for_node(node: str) -> str | None:
+    if cmds.nodeType(node) == "transform":
+        return node
+    parents = cmds.listRelatives(node, parent=True, fullPath=True) or []
+    return parents[0] if parents else None
 
 
 def _set_or_add_double_attr(node: str, attr: str, value: float) -> None:

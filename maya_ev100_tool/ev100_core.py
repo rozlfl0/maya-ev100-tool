@@ -57,6 +57,18 @@ class EV100Scenario:
         return self.value_label or ("%.1f" % self.ev100).rstrip("0").rstrip(".")
 
 
+@dataclass(frozen=True)
+class LocalLightPreset:
+    """Reference lumen preset for local light creation."""
+
+    name: str
+    lumens: float
+    category: str
+    kelvin: float
+    description: str = ""
+    common_range: str = ""
+
+
 CALIBRATION_SWATCHES = (
     CalibrationSwatch(
         name="middle_gray",
@@ -88,6 +100,42 @@ EV100_SCENARIOS = (
     EV100Scenario("사무실/작업 공간", 7.5, "실내", "Offices & work areas", "7-8"),
     EV100Scenario("주거 실내", 6.0, "실내", "Home interiors", "5-7"),
 )
+
+
+LOCAL_LIGHT_PRESETS = (
+    LocalLightPreset("Candle", 13.0, "practical", 1800.0, "Candle / small flame"),
+    LocalLightPreset("Kerosene", 50.0, "practical", 1900.0, "Kerosene lamp", "8-100 lm"),
+    LocalLightPreset("Incandescent", 300.0, "bulb", 2700.0, "Household tungsten bulb", "130-1500 lm"),
+    LocalLightPreset("Decorative Light", 300.0, "practical", 2700.0, "Decorative practical light"),
+    LocalLightPreset("LED", 400.0, "bulb", 5600.0, "Common LED bulb", "250-1500 lm"),
+    LocalLightPreset("General Lighting", 435.0, "room", 4000.0, "General small-room lighting", "400-470 lm"),
+    LocalLightPreset("Functional Lighting", 1000.0, "room", 4000.0, "Task / functional lighting", "806-1520 lm"),
+    LocalLightPreset("Interior Light", 1000.0, "room", 3200.0, "Interior practical light"),
+    LocalLightPreset("Halogen", 1500.0, "bulb", 3200.0, "Halogen / car or outdoor practical", "1000-2000 lm"),
+    LocalLightPreset("Car Headlights", 1500.0, "vehicle", 4300.0, "Single car headlight", "700-2000 lm"),
+    LocalLightPreset("Fluorescent & CFL", 2000.0, "tube", 4000.0, "Fluorescent / CFL fixture", "1000-5000 lm"),
+    LocalLightPreset("Exterior Light", 10000.0, "exterior", 5600.0, "Exterior fixture"),
+    LocalLightPreset("Photo Flash", 20000.0, "flash", 5600.0, "Photo flash burst"),
+    LocalLightPreset("Street Lights", 60000.0, "street", 2200.0, "Sodium-vapor style street light", "2000-140000 lm"),
+)
+
+
+def local_light_exposure_from_lumens(lumens: float, baseline_lumens: float = 1000.0) -> float:
+    """Return a practical exposure-stop starting point from lumens.
+
+    This is an artist-friendly initial scale, not a claim that Arnold intensity is a true lumen unit.
+    1000 lm maps to exposure 0; each doubling adds +1 stop.
+    """
+    _require_positive("lumens", lumens)
+    _require_positive("baseline_lumens", baseline_lumens)
+    return math.log2(float(lumens) / float(baseline_lumens))
+
+
+def local_light_intensity_from_lumens(lumens: float, baseline_lumens: float = 1000.0) -> float:
+    """Return a safe Maya-light intensity fallback when no exposure attr exists."""
+    _require_positive("lumens", lumens)
+    _require_positive("baseline_lumens", baseline_lumens)
+    return float(lumens) / float(baseline_lumens)
 
 
 def calibration_swatch_by_name(name: str) -> CalibrationSwatch:
