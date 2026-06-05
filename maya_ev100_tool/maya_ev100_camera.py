@@ -116,9 +116,7 @@ def show() -> None:
         )
 
     cmds.optionMenu(scenario_menu, edit=True, changeCommand=load_scenario)
-    cmds.rowLayout(numberOfColumns=3, columnWidth3=(150, 150, 190), adjustableColumn=3)
-    cmds.button(label="시나리오 EV 불러오기", command=load_scenario)
-    cmds.button(label="계산", command=calculate_only)
+    cmds.rowLayout(numberOfColumns=1, columnWidth1=220)
     cmds.button(label="카메라에 EV100 적용", command=apply_to_selected)
     cmds.setParent("..")
 
@@ -143,8 +141,10 @@ def show() -> None:
                 return swatch
         raise RuntimeError("Unknown calibration target: %s" % selected_label)
 
-    def analyze_dome_exposure(*_args):
+    def _analyze_dome_exposure_with_current(current_dome_exposure=None):
         swatch = _selected_calibration_swatch()
+        if current_dome_exposure is None:
+            current_dome_exposure = cmds.floatFieldGrp(dome_exposure, query=True, value1=True)
         result_data = estimate_hdri_ev_calibration(
             current_ev100=cmds.floatFieldGrp(ev100, query=True, value1=True),
             measured_rgb=(
@@ -153,17 +153,18 @@ def show() -> None:
                 cmds.floatFieldGrp(hdri_b, query=True, value1=True),
             ),
             target_reflectance=swatch.reflectance,
-            current_dome_exposure=cmds.floatFieldGrp(dome_exposure, query=True, value1=True),
+            current_dome_exposure=current_dome_exposure,
         )
         direction = "어두움 → 올리기" if result_data.correction_stops > 0.0 else "밝음 → 낮추기"
         cmds.text(
             hdri_result,
             edit=True,
             label=(
-                "평균 %.3f / 타겟 %.3f / 보정 %.3f stops (%s)\n"
-                "추천 Dome Exposure %.3f"
+                "현재 Dome %.3f / 평균 %.3f / 타겟 %.3f\n"
+                "보정 %.3f stops (%s) → 추천 Dome Exposure %.3f"
             )
             % (
+                current_dome_exposure,
                 result_data.measured_average,
                 result_data.target_reflectance,
                 result_data.correction_stops,
@@ -173,9 +174,14 @@ def show() -> None:
         )
         return result_data
 
+    def analyze_dome_exposure(*_args):
+        return _analyze_dome_exposure_with_current()
+
     def apply_dome_exposure_to_selected(*_args):
-        result_data = analyze_dome_exposure()
         dome_node = get_selected_exposure_node()
+        current_exposure = cmds.getAttr("%s.exposure" % dome_node)
+        cmds.floatFieldGrp(dome_exposure, edit=True, value1=current_exposure)
+        result_data = _analyze_dome_exposure_with_current(current_exposure)
         cmds.setAttr("%s.exposure" % dome_node, result_data.recommended_dome_exposure)
         cmds.floatFieldGrp(dome_exposure, edit=True, value1=result_data.recommended_dome_exposure)
         cmds.inViewMessage(
