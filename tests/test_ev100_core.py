@@ -125,11 +125,12 @@ def test_default_local_light_rig_settings_give_practical_distance_and_size():
     assert rect_candle.source_size_m >= 0.1
 
 
-def test_meters_to_scene_units_handles_default_maya_centimeters():
-    assert meters_to_scene_units(0.5, "cm") == pytest_approx(50.0)
-    assert meters_to_scene_units(5.0, "cm") == pytest_approx(500.0)
-    assert meters_to_scene_units(1.0, "m") == pytest_approx(1.0)
-    assert meters_to_scene_units(1.0, "ft") == pytest_approx(3.280839895)
+def test_meters_to_scene_units_handles_default_maya_centimeters_at_tool_scale():
+    assert meters_to_scene_units(0.5, "cm") == pytest_approx(5.0)
+    assert meters_to_scene_units(5.0, "cm") == pytest_approx(50.0)
+    assert meters_to_scene_units(1.0, "m") == pytest_approx(0.1)
+    assert meters_to_scene_units(1.0, "ft") == pytest_approx(0.3280839895)
+    assert meters_to_scene_units(1.0, "cm", scene_scale=1.0) == pytest_approx(100.0)
 
 
 def test_estimate_hdri_ev_calibration_darkens_when_gray_renders_too_bright():

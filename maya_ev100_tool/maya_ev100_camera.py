@@ -499,7 +499,7 @@ def create_local_light_distance_rig(
 
 
 def _meters_to_scene_units(meters: float) -> float:
-    """Convert artist-facing meters to the current Maya linear scene unit."""
+    """Convert artist-facing meters to current Maya units at 1/10 rig scale."""
     unit = "cm"
     try:
         unit = cmds.currentUnit(query=True, linear=True)

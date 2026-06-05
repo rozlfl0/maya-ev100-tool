@@ -228,7 +228,7 @@ PBL_<Preset>_GrayCard_0p18
 PBL_<Preset>_<Type> light
 ```
 
-The light is placed at the requested meter distance from the target and aimed toward it. If **선택 오브젝트 중심을 타겟으로 사용** is enabled, the selected object's bounding-box center becomes the target; otherwise the rig starts at world origin. The rig converts meters to the current Maya scene unit, so in a default centimeter scene `0.5m` becomes `50` Maya units and `5m` becomes `500` Maya units. The rig stores `pbl_distance_m`, `pbl_source_size_m`, `pbl_lumens`, and `pbl_kelvin` metadata.
+The light is placed at the requested meter distance from the target and aimed toward it. If **선택 오브젝트 중심을 타겟으로 사용** is enabled, the selected object's bounding-box center becomes the target; otherwise the rig starts at world origin. The rig converts meters to the current Maya scene unit, then applies a practical **1/10 rig scale**, so in a default centimeter scene `0.5m` becomes `5` Maya units and `5m` becomes `50` Maya units. The rig stores `pbl_distance_m`, `pbl_source_size_m`, `pbl_lumens`, and `pbl_kelvin` metadata.
 
 Default distance/source-size starting points:
 

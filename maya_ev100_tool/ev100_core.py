@@ -155,11 +155,12 @@ def local_light_intensity_from_lumens(lumens: float, baseline_lumens: float = 0.
     return float(lumens) / float(baseline_lumens)
 
 
-def meters_to_scene_units(meters: float, linear_unit: str = "cm") -> float:
+def meters_to_scene_units(meters: float, linear_unit: str = "cm", scene_scale: float = 0.1) -> float:
     """Convert meters to Maya scene units for a given linear unit.
 
-    Maya commonly defaults to centimeters, so 1.0 meter is 100 scene units in
-    a default scene. The input remains artist-facing meters.
+    Maya commonly defaults to centimeters, where true 1.0 meter is 100 scene
+    units. For practical VFX layout in this tool we apply a 1/10 rig scale by
+    default, so 1.0 UI meter becomes 10 units in a default centimeter scene.
     """
     meters_to_unit = {
         "mm": 1000.0,
@@ -177,7 +178,7 @@ def meters_to_scene_units(meters: float, linear_unit: str = "cm") -> float:
         "yd": 1.093613298,
         "yard": 1.093613298,
     }
-    return float(meters) * meters_to_unit.get(str(linear_unit).strip().lower(), 100.0)
+    return float(meters) * meters_to_unit.get(str(linear_unit).strip().lower(), 100.0) * float(scene_scale)
 
 
 def default_local_light_rig_settings(preset_name: str, light_type: str | None = None) -> LocalLightRigSettings:
