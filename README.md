@@ -221,12 +221,17 @@ Workflow:
 The lumen value is used as a practical starting scale:
 
 ```text
+Lights with exposure attr:
 1000 lm -> exposure 0
 2000 lm -> exposure +1
 500 lm  -> exposure -1
+
+Maya Point/Spot fallback with intensity only:
+13 lm   -> intensity 1300
+500 lm  -> intensity 50000
 ```
 
-This is intentionally an artist-safe initial scale, not a claim that every Maya/Arnold light type interprets `intensity` as true lumens. The final reliable step is the same gray-pixel calibration:
+This is intentionally an artist-safe initial scale, not a claim that every Maya/Arnold light type interprets `intensity` as true lumens. Maya default Point/Spot `intensity` needs a much larger practical fallback scale under EV100 camera exposure, so the tool uses `intensity = lumens * 100` when no `exposure` attribute exists. The final reliable step is the same gray-pixel calibration:
 
 ```text
 correction_stops = log2(0.18 / measured_average)

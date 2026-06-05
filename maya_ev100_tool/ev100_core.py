@@ -131,8 +131,14 @@ def local_light_exposure_from_lumens(lumens: float, baseline_lumens: float = 100
     return math.log2(float(lumens) / float(baseline_lumens))
 
 
-def local_light_intensity_from_lumens(lumens: float, baseline_lumens: float = 1000.0) -> float:
-    """Return a safe Maya-light intensity fallback when no exposure attr exists."""
+def local_light_intensity_from_lumens(lumens: float, baseline_lumens: float = 0.01) -> float:
+    """Return a practical Maya-light intensity fallback when no exposure attr exists.
+
+    Maya's default Point/Spot light ``intensity`` does not behave like a physical
+    lumen input. In the user's EV100 -12 camera workflow, a 13 lm candle only
+    became visible around intensity 1300, so the fallback maps 0.01 lm -> 1.0
+    intensity, i.e. intensity = lumens * 100.
+    """
     _require_positive("lumens", lumens)
     _require_positive("baseline_lumens", baseline_lumens)
     return float(lumens) / float(baseline_lumens)

@@ -101,7 +101,8 @@ def test_local_light_presets_include_reference_lumen_values_from_table():
 def test_local_light_lumen_scale_uses_1000_lumen_baseline():
     assert local_light_exposure_from_lumens(1000.0) == pytest_approx(0.0)
     assert local_light_exposure_from_lumens(2000.0) == pytest_approx(1.0)
-    assert local_light_intensity_from_lumens(500.0) == pytest_approx(0.5)
+    assert local_light_intensity_from_lumens(13.0) == pytest_approx(1300.0)
+    assert local_light_intensity_from_lumens(500.0) == pytest_approx(50000.0)
 
 
 def test_estimate_hdri_ev_calibration_darkens_when_gray_renders_too_bright():
