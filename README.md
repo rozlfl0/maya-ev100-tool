@@ -46,6 +46,23 @@ from maya_ev100_tool import maya_ev100_camera
 maya_ev100_camera.show()
 ```
 
+If Maya already imported an older version during the same session, use this reload-safe snippet instead:
+
+```python
+import sys
+import importlib
+
+sys.path.insert(0, r"C:/Users/maste/Desktop/maya_ev100_tool")
+
+import maya_ev100_tool.ev100_core as ev100_core
+import maya_ev100_tool.maya_ev100_camera as maya_ev100_camera
+
+importlib.reload(ev100_core)
+importlib.reload(maya_ev100_camera)
+
+maya_ev100_camera.show()
+```
+
 Then select a camera transform or camera shape, enter EV100, and click **Apply to Selected Camera**.
 
 Example starting points:
