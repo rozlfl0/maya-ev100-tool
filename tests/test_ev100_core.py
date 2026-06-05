@@ -4,6 +4,7 @@ from maya_ev100_tool.ev100_core import (
     CALIBRATION_CUBE_ROTATE_X_DEGREES,
     CALIBRATION_SWATCHES,
     DirectEV100Settings,
+    EV100_SCENARIOS,
     ExposureSettings,
     average_linear_rgb,
     calibration_swatch_by_name,
@@ -77,6 +78,13 @@ def test_calibration_cubes_default_to_45_degree_x_rotation():
     assert CALIBRATION_CUBE_ROTATE_X_DEGREES == pytest_approx(45.0)
 
 
+def test_ev100_scenarios_include_exterior_and_interior_reference_values():
+    scenarios = {scenario.name: scenario for scenario in EV100_SCENARIOS}
+    assert scenarios["Sunny exterior noon"].ev100 == pytest_approx(15.0)
+    assert scenarios["Sunny exterior morning 8AM"].ev100 == pytest_approx(13.5)
+    assert scenarios["Bright office interior"].ev100 == pytest_approx(8.0)
+
+
 def test_average_linear_rgb_uses_simple_channel_average():
     assert average_linear_rgb((0.2, 0.4, 0.6)) == pytest_approx(0.4)
 
@@ -86,10 +94,12 @@ def test_estimate_hdri_ev_calibration_darkens_when_gray_renders_too_bright():
         current_ev100=12.0,
         measured_rgb=(0.72, 0.72, 0.72),
         target_reflectance=0.18,
+        current_dome_exposure=0.5,
     )
 
     assert result.measured_average == pytest_approx(0.72)
     assert result.correction_stops == pytest_approx(-2.0)
+    assert result.recommended_dome_exposure == pytest_approx(-1.5)
     assert result.recommended_ev100 == pytest_approx(14.0)
     assert result.recommended_calibration_offset == pytest_approx(-2.0)
 
@@ -103,6 +113,7 @@ def test_estimate_hdri_ev_calibration_brightens_when_gray_renders_too_dark():
     )
 
     assert result.correction_stops == pytest_approx(1.0)
+    assert result.recommended_dome_exposure == pytest_approx(1.0)
     assert result.recommended_ev100 == pytest_approx(11.0)
     assert result.recommended_calibration_offset == pytest_approx(1.5)
 

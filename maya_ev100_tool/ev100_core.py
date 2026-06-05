@@ -29,15 +29,27 @@ class CalibrationSwatch:
 
 @dataclass(frozen=True)
 class HDRIEVCalibrationResult:
-    """Recommended EV/calibration correction from a rendered reflectance target."""
+    """Recommended dome-light correction from a rendered reflectance target."""
 
     current_ev100: float
     target_reflectance: float
     measured_average: float
     correction_stops: float
-    recommended_ev100: float
+    recommended_dome_exposure: float
+    current_dome_exposure: float = 0.0
     current_calibration_offset: float = 0.0
     recommended_calibration_offset: float = 0.0
+    recommended_ev100: float = 0.0
+
+
+@dataclass(frozen=True)
+class EV100Scenario:
+    """Reference EV100 preset for physical lighting setup."""
+
+    name: str
+    ev100: float
+    category: str
+    description: str
 
 
 CALIBRATION_SWATCHES = (
@@ -59,6 +71,20 @@ CALIBRATION_SWATCHES = (
         reflectance=0.031,
         description="Dark diffuse reference for shadow/min EV calibration.",
     ),
+)
+
+
+EV100_SCENARIOS = (
+    EV100Scenario("Sunny exterior noon", 15.0, "Exterior", "Bright direct sun / noon baseline."),
+    EV100Scenario("Sunny exterior morning 8AM", 13.5, "Exterior", "Clear morning exterior starting point."),
+    EV100Scenario("Sunny exterior late afternoon", 13.0, "Exterior", "Lower sun angle / warm afternoon."),
+    EV100Scenario("Overcast exterior", 12.0, "Exterior", "Cloudy daylight, soft sky."),
+    EV100Scenario("Open shade exterior", 11.0, "Exterior", "Subject in shade with daylight sky fill."),
+    EV100Scenario("Bright studio / stage", 9.0, "Interior", "Strong artificial lighting."),
+    EV100Scenario("Bright office interior", 8.0, "Interior", "Typical bright office or shop interior."),
+    EV100Scenario("Home interior", 6.0, "Interior", "Normal residential practical lighting."),
+    EV100Scenario("Dim interior", 5.0, "Interior", "Low practical light / moody interior."),
+    EV100Scenario("Night street", 2.0, "Exterior night", "Streetlights / night exterior starting point."),
 )
 
 
@@ -194,6 +220,7 @@ def estimate_hdri_ev_calibration(
     current_ev100: float,
     measured_rgb: tuple[float, float, float],
     target_reflectance: float = MIDDLE_GRAY_LINEAR,
+    current_dome_exposure: float = 0.0,
     current_calibration_offset: float = 0.0,
 ) -> HDRIEVCalibrationResult:
     """Estimate EV100/calibration correction for an unknown-exposure HDRI.
@@ -211,15 +238,18 @@ def estimate_hdri_ev_calibration(
     measured_average = average_linear_rgb(measured_rgb)
     correction_stops = math.log2(float(target_reflectance) / measured_average)
     current_ev100 = float(current_ev100)
+    current_dome_exposure = float(current_dome_exposure)
     current_calibration_offset = float(current_calibration_offset)
     return HDRIEVCalibrationResult(
         current_ev100=current_ev100,
         target_reflectance=float(target_reflectance),
         measured_average=measured_average,
         correction_stops=correction_stops,
-        recommended_ev100=current_ev100 - correction_stops,
+        recommended_dome_exposure=current_dome_exposure + correction_stops,
+        current_dome_exposure=current_dome_exposure,
         current_calibration_offset=current_calibration_offset,
         recommended_calibration_offset=current_calibration_offset + correction_stops,
+        recommended_ev100=current_ev100 - correction_stops,
     )
 
 

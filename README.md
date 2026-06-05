@@ -1,16 +1,20 @@
-# Maya EV100 Camera Exposure MVP
+# Maya EV100 Physical Lighting Toolkit
 
-A small Maya helper for setting camera exposure from a direct EV100 value without touching motion-blur shutter settings.
+A small Maya/Arnold helper for a physically based lighting workflow:
 
-The core EV100 math lives in `maya_ev100_tool.ev100_core` and has no Maya dependency, so it can be tested outside Maya. The Maya UI and camera attribute updates live in `maya_ev100_tool.maya_ev100_camera`.
+```text
+Choose lighting scenario EV100 -> apply to camera -> calibrate HDRI Dome Light exposure with target pixels
+```
+
+The core EV100 math lives in `maya_ev100_tool.ev100_core` and has no Maya dependency, so it can be tested outside Maya. The Maya UI and camera/light attribute updates live in `maya_ev100_tool.maya_ev100_camera`.
 
 ## What It Does
 
-- Accepts a direct EV100 value, exposure compensation, and calibration offset.
-- Calculates the recommended Maya/Arnold camera exposure:
+- Provides EV100 scenario presets for exterior/interior lighting references.
+- Applies the selected EV100 to a Maya/Arnold camera exposure:
 
 ```text
-camera exposure = -EV100 + exposure compensation + calibration offset
+camera exposure = -EV100
 ```
 
 - Stores the calculated values as custom attributes on the selected camera shape:
@@ -21,18 +25,23 @@ camera exposure = -EV100 + exposure compensation + calibration offset
   - `pbl_recommended_camera_exposure`
 - Applies the recommendation to Arnold `aiExposure` when that attribute exists on the camera shape.
 - Creates calibration cubes with neutral diffuse reflectance values `0.71`, `0.18`, and `0.031` for pixel-inspector/light-meter workflows.
-- Estimates an unknown HDRI's practical EV/calibration offset by comparing sampled linear RGB from a rendered calibration cube against its target reflectance.
+- Analyzes sampled target RGB values and recommends how much to raise/lower Arnold Dome Light `exposure`.
+- Can apply the recommended dome exposure to a selected dome light/shape when it has an `exposure` attribute.
 - Does **not** change Maya/Arnold motion-blur shutter, shutter angle, shutter open/close, or render motion-blur settings.
 
-## Why Direct EV100?
+## Physical Workflow
 
-For VFX lighting work, ISO, shutter speed, and f-stop can be confusing because shutter values may also imply motion-blur behavior. This MVP keeps the workflow simple:
+The intended workflow mirrors Unreal-style physically based lighting:
 
 ```text
-Enter EV100 -> Apply camera exposure
+1. Pick a time/weather/interior scenario.
+2. Use the reference EV100 for the camera.
+3. Put the HDRI in an Arnold SkyDome/Dome Light.
+4. Render calibration cubes.
+5. Match target pixel values by changing Dome Light exposure, not camera EV.
 ```
 
-The EV100 value is treated as exposure metadata only. Motion blur timing remains controlled by the normal Maya/Arnold render settings.
+EV100 belongs to the **camera/scenario**. HDRI target-pixel matching belongs to the **Dome Light exposure**.
 
 ## Use In Maya
 
@@ -65,17 +74,39 @@ importlib.reload(maya_ev100_camera)
 maya_ev100_camera.show()
 ```
 
-Then select a camera transform or camera shape, enter EV100, and click **Apply to Selected Camera**.
+## EV100 Scenario Presets
 
-Example starting points:
+The UI includes a **Lighting Scenario** dropdown. Current starter references:
 
 ```text
-EV100 15: bright sunny daylight
-EV100 12: overcast daylight
-EV100 8 : bright office / studio interior
-EV100 5 : dim interior
-EV100 2 : night street / low light
+Sunny exterior noon          EV100 15.0
+Sunny exterior morning 8AM   EV100 13.5
+Sunny exterior late afternoon EV100 13.0
+Overcast exterior            EV100 12.0
+Open shade exterior          EV100 11.0
+Bright studio / stage        EV100 9.0
+Bright office interior       EV100 8.0
+Home interior                EV100 6.0
+Dim interior                 EV100 5.0
+Night street                 EV100 2.0
 ```
+
+These are practical starting values. Replace/refine them with a studio reference sheet when exact production values are available.
+
+## Camera EV100 Setup
+
+1. Select a camera transform or camera shape.
+2. Choose a lighting scenario from the dropdown.
+3. Click **Load Scenario EV** if needed.
+4. Click **Apply EV100 to Camera**.
+
+The tool sets Arnold camera exposure when `aiExposure` exists:
+
+```text
+aiExposure = -EV100
+```
+
+No exposure compensation or calibration offset is required in the default workflow. If the core still stores offset-related custom attrs, they remain `0` for compatibility.
 
 ## Calibration Cubes
 
@@ -87,65 +118,50 @@ Middle Gray : 0.18
 Charcoal    : 0.031
 ```
 
-Each cube receives a neutral Lambert material whose linear RGB values match the target reflectance. The cube transform, shape, and shader also store `pbl_reflectance` metadata.
+Each cube receives a neutral Lambert material whose linear RGB values match the target reflectance. The cubes are created with `Rotate X = 45` degrees so angled/side light can be sampled more easily. The cube transform, shape, and shader also store `pbl_reflectance` metadata.
 
-Suggested workflow:
+## Dome HDRI Calibration
 
-1. Set the camera EV100 value for the lighting condition, for example `EV100 15` for bright noon daylight.
-2. Place the calibration cubes where you want to measure the light response.
-3. Render with your normal Maya/Arnold/OCIO setup.
-4. Use a pixel inspector or sampled render value on the lit face of each cube.
-5. Average linear RGB roughly as `(R + G + B) / 3`.
-6. Adjust exposure/calibration until the sampled values are near the cube references:
-   - bright/lit reference: `0.71`
-   - middle gray: `0.18`
-   - dark/shadow reference: `0.031`
-
-This mirrors the Unreal calibration note: find the value where white paper does not clip and charcoal does not crush, then use the resulting EV/calibration range as the shot or environment baseline.
-
-## HDRI EV Calibrator
-
-Use this when an HDRI has no trustworthy exposure metadata and you want to find the practical EV100 or offset for your Maya/Arnold setup.
-
-Important limitation: the tool does **not** prove the absolute real-world EV from the HDRI file alone. It estimates the EV/calibration correction from a rendered known target in your current scene, renderer, and color pipeline.
+Use this when an HDRI has no trustworthy exposure metadata and you want to tune the Arnold Dome Light brightness against target pixels.
 
 Workflow:
 
-1. Load the HDRI into your sky dome/environment.
-2. Create the calibration cubes and place them at the measurement position.
-3. Set a starting EV100, for example `12` or `15`.
-4. Render.
-5. Sample the lit face of a cube in **linear RGB**.
-6. In **HDRI EV Calibrator**, choose the same target:
+1. Apply the EV100 scenario to the camera.
+2. Load the HDRI into the Dome/SkyDome Light.
+3. Keep Dome `exposure` at `0` for the first test.
+4. Render the calibration cubes.
+5. Sample a lit cube face in **linear RGB**.
+6. In **Dome HDRI Calibration**, choose the matching target:
    - `White Paper 0.71`
    - `Middle Gray 0.18`
    - `Charcoal 0.031`
 7. Enter sampled `R`, `G`, and `B`.
-8. Click **Estimate HDRI EV**.
+8. Enter the current Dome Light exposure.
+9. Click **Analyze Dome Exposure**.
 
 The calculation is:
 
 ```text
 measured_average = (R + G + B) / 3
 correction_stops = log2(target_reflectance / measured_average)
-recommended_ev100 = current_ev100 - correction_stops
-recommended_calibration_offset = current_calibration_offset + correction_stops
+recommended_dome_exposure = current_dome_exposure + correction_stops
 ```
 
 Example:
 
 ```text
-Current EV100: 12
 Target: Middle Gray 0.18
-Measured RGB: 0.72 / 0.72 / 0.72
+Current Dome Exposure: 0
+Measured RGB: 0.247 / 0.246 / 0.268
+Average: 0.254
 
-correction_stops = -2
-recommended_ev100 = 14
+correction_stops ≈ -0.49
+recommended_dome_exposure ≈ -0.49
 ```
 
-Meaning: the HDRI is rendering the gray card two stops too bright at EV100 12, so either use roughly `EV100 14` or apply a `-2` stop calibration offset.
+Meaning: the HDRI/Dome is about half a stop too bright for the chosen EV100 camera setup, so lower the Dome Light exposure by about `-0.5` stop.
 
-Click **Apply Suggested Offset** to write the recommended calibration offset into the main `Calibration Offset` field, then apply the camera settings if desired.
+To apply automatically, select the Arnold dome light transform or shape and click **Apply to Selected Dome Light**. The selected node or its shape must have an `exposure` attribute.
 
 ## Test Outside Maya
 
@@ -153,14 +169,5 @@ The pure EV100 helpers can be tested with pytest:
 
 ```bash
 python -m pytest -q
+python -m compileall maya_ev100_tool -q
 ```
-
-## Calibration Note
-
-This MVP uses a simple exposure-stop mapping:
-
-```text
-Maya/Arnold exposure stops = -EV100 + exposure compensation + calibration offset
-```
-
-For production use, calibrate `calibration_offset` with your studio's Arnold, OCIO, HDRI, and grey-card workflow.

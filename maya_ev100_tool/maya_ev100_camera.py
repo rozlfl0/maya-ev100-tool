@@ -20,6 +20,7 @@ from __future__ import annotations
 from .ev100_core import (
     CALIBRATION_CUBE_ROTATE_X_DEGREES,
     CALIBRATION_SWATCHES,
+    EV100_SCENARIOS,
     DirectEV100Settings,
     ExposureSettings,
     estimate_hdri_ev_calibration,
@@ -48,23 +49,42 @@ LEGACY_PHYSICAL_ATTRS = {
 }
 
 
+def _scenario_label(scenario) -> str:
+    return "%s / EV100 %.1f" % (scenario.name, scenario.ev100)
+
+
 def show() -> None:
-    """Open the EV100 MVP UI inside Maya."""
+    """Open the physical EV100 / dome calibration UI inside Maya."""
     _require_maya()
     if cmds.window(WINDOW_NAME, exists=True):
         cmds.deleteUI(WINDOW_NAME)
 
-    window = cmds.window(WINDOW_NAME, title="EV100 Camera Exposure MVP", sizeable=False)
+    window = cmds.window(WINDOW_NAME, title="Physical EV100 Lighting Toolkit", sizeable=False)
     cmds.columnLayout(adjustableColumn=True, rowSpacing=8, columnAttach=("both", 10))
 
-    cmds.text(label="Select a Maya camera, enter EV100, then Apply.", align="left")
-    ev100 = cmds.floatFieldGrp(label="EV100", value1=10.0, numberOfFields=1)
-    comp = cmds.floatFieldGrp(label="Exposure Comp", value1=0.0, numberOfFields=1)
-    calib = cmds.floatFieldGrp(label="Calibration Offset", value1=0.0, numberOfFields=1)
+    cmds.text(label="1) Pick a lighting scenario EV100, then apply it to the selected camera.", align="left")
+    scenario_menu = cmds.optionMenu(label="Lighting Scenario")
+    for scenario in EV100_SCENARIOS:
+        cmds.menuItem(label=_scenario_label(scenario))
+    ev100 = cmds.floatFieldGrp(label="EV100", value1=EV100_SCENARIOS[0].ev100, numberOfFields=1)
+    scenario_note = cmds.text(label="", align="left")
     result = cmds.text(label="EV100: - / Maya exposure: -", align="left")
 
+    def _selected_scenario():
+        selected_label = cmds.optionMenu(scenario_menu, query=True, value=True)
+        for scenario in EV100_SCENARIOS:
+            if _scenario_label(scenario) == selected_label:
+                return scenario
+        raise RuntimeError("Unknown EV100 scenario: %s" % selected_label)
+
+    def load_scenario(*_args):
+        scenario = _selected_scenario()
+        cmds.floatFieldGrp(ev100, edit=True, value1=scenario.ev100)
+        cmds.text(scenario_note, edit=True, label="%s / EV100 %.1f - %s" % (scenario.category, scenario.ev100, scenario.description))
+        return calculate_only()
+
     def calculate_only(*_args):
-        settings = _read_direct_ev100_settings(ev100, comp, calib)
+        settings = DirectEV100Settings(ev100=cmds.floatFieldGrp(ev100, query=True, value1=True))
         cmds.text(
             result,
             edit=True,
@@ -86,23 +106,26 @@ def show() -> None:
             fade=True,
         )
 
-    cmds.rowLayout(numberOfColumns=2, columnWidth2=(180, 180), adjustableColumn=2)
+    cmds.optionMenu(scenario_menu, edit=True, changeCommand=load_scenario)
+    cmds.rowLayout(numberOfColumns=3, columnWidth3=(150, 150, 190), adjustableColumn=3)
+    cmds.button(label="Load Scenario EV", command=load_scenario)
     cmds.button(label="Calculate", command=calculate_only)
-    cmds.button(label="Apply to Selected Camera", command=apply_to_selected)
+    cmds.button(label="Apply EV100 to Camera", command=apply_to_selected)
     cmds.setParent("..")
 
     cmds.separator(height=8, style="in")
     cmds.button(label="Create Calibration Cubes (0.71 / 0.18 / 0.031)", command=lambda *_args: create_calibration_cubes())
 
     cmds.separator(height=8, style="in")
-    cmds.text(label="HDRI EV Calibrator: sample a rendered cube face in linear RGB.", align="left")
-    hdri_target = cmds.optionMenu(label="Target")
+    cmds.text(label="2) Dome HDRI Calibration: enter sampled target RGB, then adjust Dome Light exposure.", align="left")
+    hdri_target = cmds.optionMenu(label="Target Pixel")
     for swatch in CALIBRATION_SWATCHES:
         cmds.menuItem(label=swatch.label)
+    dome_exposure = cmds.floatFieldGrp(label="Current Dome Exposure", value1=0.0, numberOfFields=1)
     hdri_r = cmds.floatFieldGrp(label="Measured R", value1=0.18, numberOfFields=1)
     hdri_g = cmds.floatFieldGrp(label="Measured G", value1=0.18, numberOfFields=1)
     hdri_b = cmds.floatFieldGrp(label="Measured B", value1=0.18, numberOfFields=1)
-    hdri_result = cmds.text(label="HDRI EV: -", align="left")
+    hdri_result = cmds.text(label="Dome calibration: -", align="left")
 
     def _selected_calibration_swatch():
         selected_label = cmds.optionMenu(hdri_target, query=True, value=True)
@@ -111,7 +134,7 @@ def show() -> None:
                 return swatch
         raise RuntimeError("Unknown calibration target: %s" % selected_label)
 
-    def calculate_hdri_ev(*_args):
+    def analyze_dome_exposure(*_args):
         swatch = _selected_calibration_swatch()
         result_data = estimate_hdri_ev_calibration(
             current_ev100=cmds.floatFieldGrp(ev100, query=True, value1=True),
@@ -121,50 +144,51 @@ def show() -> None:
                 cmds.floatFieldGrp(hdri_b, query=True, value1=True),
             ),
             target_reflectance=swatch.reflectance,
-            current_calibration_offset=cmds.floatFieldGrp(calib, query=True, value1=True),
+            current_dome_exposure=cmds.floatFieldGrp(dome_exposure, query=True, value1=True),
         )
+        direction = "brighter" if result_data.correction_stops > 0.0 else "darker"
         cmds.text(
             hdri_result,
             edit=True,
             label=(
-                "Avg %.3f / target %.3f / correction %.3f stops\n"
-                "Recommended EV100 %.3f or calibration offset %.3f"
+                "Avg %.3f / target %.3f / correction %.3f stops (%s)\n"
+                "Recommended Dome Exposure %.3f"
             )
             % (
                 result_data.measured_average,
                 result_data.target_reflectance,
                 result_data.correction_stops,
-                result_data.recommended_ev100,
-                result_data.recommended_calibration_offset,
+                direction,
+                result_data.recommended_dome_exposure,
             ),
         )
         return result_data
 
-    def apply_hdri_calibration_offset(*_args):
-        result_data = calculate_hdri_ev()
-        cmds.floatFieldGrp(calib, edit=True, value1=result_data.recommended_calibration_offset)
-        calculate_only()
+    def apply_dome_exposure_to_selected(*_args):
+        result_data = analyze_dome_exposure()
+        dome_node = get_selected_exposure_node()
+        cmds.setAttr("%s.exposure" % dome_node, result_data.recommended_dome_exposure)
+        cmds.floatFieldGrp(dome_exposure, edit=True, value1=result_data.recommended_dome_exposure)
         cmds.inViewMessage(
-            amg="Applied HDRI calibration offset <hl>%.3f</hl> stops" % result_data.recommended_calibration_offset,
+            amg="Applied Dome exposure <hl>%.3f</hl> to %s" % (result_data.recommended_dome_exposure, dome_node),
             pos="topCenter",
             fade=True,
         )
 
-    cmds.rowLayout(numberOfColumns=2, columnWidth2=(180, 180), adjustableColumn=2)
-    cmds.button(label="Estimate HDRI EV", command=calculate_hdri_ev)
-    cmds.button(label="Apply Suggested Offset", command=apply_hdri_calibration_offset)
+    cmds.rowLayout(numberOfColumns=2, columnWidth2=(180, 220), adjustableColumn=2)
+    cmds.button(label="Analyze Dome Exposure", command=analyze_dome_exposure)
+    cmds.button(label="Apply to Selected Dome Light", command=apply_dome_exposure_to_selected)
     cmds.setParent("..")
 
     cmds.separator(height=8, style="in")
     cmds.text(
-        label="Note: recommended exposure = -EV100 + exposure comp + calibration offset.\n"
-        "EV100 is exposure metadata only; this tool does not change motion-blur shutter settings.\n"
-        "HDRI EV Calibrator compares a sampled calibration cube against its target reflectance.",
+        label="Workflow: EV100 belongs to the camera scenario. Target pixel matching belongs to Dome Light exposure.\n"
+        "Measured RGB must be linear render values from the calibration cube face. Motion blur settings are never changed.",
         align="left",
     )
 
     cmds.showWindow(window)
-    calculate_only()
+    load_scenario()
 
 
 def create_calibration_cubes(size: float = 1.0, spacing: float = 1.4) -> str:
@@ -303,6 +327,24 @@ def get_selected_camera_shape() -> str:
     if not cameras:
         raise RuntimeError("Selected node is not a camera: %s" % node)
     return cameras[0]
+
+
+def get_selected_exposure_node() -> str:
+    """Return selected node or child shape that has an exposure attribute."""
+    _require_maya()
+    selection = cmds.ls(selection=True, long=True) or []
+    if not selection:
+        raise RuntimeError("Select an Arnold dome light transform or shape first.")
+
+    candidates = []
+    node = selection[0]
+    candidates.append(node)
+    candidates.extend(cmds.listRelatives(node, shapes=True, fullPath=True) or [])
+
+    for candidate in candidates:
+        if cmds.attributeQuery("exposure", node=candidate, exists=True):
+            return candidate
+    raise RuntimeError("Selected node has no exposure attribute: %s" % node)
 
 
 def _read_settings(iso_field, shutter_field, fstop_field, comp_field, calib_field) -> ExposureSettings:
