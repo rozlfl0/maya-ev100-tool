@@ -27,6 +27,19 @@ class CalibrationSwatch:
         return (self.reflectance, self.reflectance, self.reflectance)
 
 
+@dataclass(frozen=True)
+class HDRIEVCalibrationResult:
+    """Recommended EV/calibration correction from a rendered reflectance target."""
+
+    current_ev100: float
+    target_reflectance: float
+    measured_average: float
+    correction_stops: float
+    recommended_ev100: float
+    current_calibration_offset: float = 0.0
+    recommended_calibration_offset: float = 0.0
+
+
 CALIBRATION_SWATCHES = (
     CalibrationSwatch(
         name="white_paper",
@@ -164,6 +177,50 @@ def luminance_stops_from_middle_gray(luminance: float, middle_gray: float = MIDD
     _require_positive("luminance", luminance)
     _require_positive("middle_gray", middle_gray)
     return math.log2(float(luminance) / float(middle_gray))
+
+
+def average_linear_rgb(rgb: tuple[float, float, float]) -> float:
+    """Return the simple average of a linear RGB sample."""
+    if len(rgb) != 3:
+        raise ValueError("rgb must contain exactly three values")
+    r, g, b = (float(channel) for channel in rgb)
+    _require_positive("red", r)
+    _require_positive("green", g)
+    _require_positive("blue", b)
+    return (r + g + b) / 3.0
+
+
+def estimate_hdri_ev_calibration(
+    current_ev100: float,
+    measured_rgb: tuple[float, float, float],
+    target_reflectance: float = MIDDLE_GRAY_LINEAR,
+    current_calibration_offset: float = 0.0,
+) -> HDRIEVCalibrationResult:
+    """Estimate EV100/calibration correction for an unknown-exposure HDRI.
+
+    Render a known reflectance target under the HDRI, sample the lit face in
+    linear RGB, then compare the measured average to the target reflectance.
+
+    correction_stops is the camera-exposure/calibration offset to apply:
+        log2(target_reflectance / measured_average)
+
+    Negative correction darkens. The equivalent recommended EV100 moves in the
+    opposite direction because higher EV100 means a darker photographic exposure.
+    """
+    _require_positive("target_reflectance", target_reflectance)
+    measured_average = average_linear_rgb(measured_rgb)
+    correction_stops = math.log2(float(target_reflectance) / measured_average)
+    current_ev100 = float(current_ev100)
+    current_calibration_offset = float(current_calibration_offset)
+    return HDRIEVCalibrationResult(
+        current_ev100=current_ev100,
+        target_reflectance=float(target_reflectance),
+        measured_average=measured_average,
+        correction_stops=correction_stops,
+        recommended_ev100=current_ev100 - correction_stops,
+        current_calibration_offset=current_calibration_offset,
+        recommended_calibration_offset=current_calibration_offset + correction_stops,
+    )
 
 
 def _require_positive(name: str, value: float) -> None:

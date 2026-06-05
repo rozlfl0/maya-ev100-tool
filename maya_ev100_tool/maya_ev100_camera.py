@@ -22,6 +22,7 @@ from .ev100_core import (
     CALIBRATION_SWATCHES,
     DirectEV100Settings,
     ExposureSettings,
+    estimate_hdri_ev_calibration,
     parse_shutter,
 )
 
@@ -94,10 +95,71 @@ def show() -> None:
     cmds.button(label="Create Calibration Cubes (0.71 / 0.18 / 0.031)", command=lambda *_args: create_calibration_cubes())
 
     cmds.separator(height=8, style="in")
+    cmds.text(label="HDRI EV Calibrator: sample a rendered cube face in linear RGB.", align="left")
+    hdri_target = cmds.optionMenu(label="Target")
+    for swatch in CALIBRATION_SWATCHES:
+        cmds.menuItem(label=swatch.label)
+    hdri_r = cmds.floatFieldGrp(label="Measured R", value1=0.18, numberOfFields=1)
+    hdri_g = cmds.floatFieldGrp(label="Measured G", value1=0.18, numberOfFields=1)
+    hdri_b = cmds.floatFieldGrp(label="Measured B", value1=0.18, numberOfFields=1)
+    hdri_result = cmds.text(label="HDRI EV: -", align="left")
+
+    def _selected_calibration_swatch():
+        selected_label = cmds.optionMenu(hdri_target, query=True, value=True)
+        for swatch in CALIBRATION_SWATCHES:
+            if swatch.label == selected_label:
+                return swatch
+        raise RuntimeError("Unknown calibration target: %s" % selected_label)
+
+    def calculate_hdri_ev(*_args):
+        swatch = _selected_calibration_swatch()
+        result_data = estimate_hdri_ev_calibration(
+            current_ev100=cmds.floatFieldGrp(ev100, query=True, value1=True),
+            measured_rgb=(
+                cmds.floatFieldGrp(hdri_r, query=True, value1=True),
+                cmds.floatFieldGrp(hdri_g, query=True, value1=True),
+                cmds.floatFieldGrp(hdri_b, query=True, value1=True),
+            ),
+            target_reflectance=swatch.reflectance,
+            current_calibration_offset=cmds.floatFieldGrp(calib, query=True, value1=True),
+        )
+        cmds.text(
+            hdri_result,
+            edit=True,
+            label=(
+                "Avg %.3f / target %.3f / correction %.3f stops\n"
+                "Recommended EV100 %.3f or calibration offset %.3f"
+            )
+            % (
+                result_data.measured_average,
+                result_data.target_reflectance,
+                result_data.correction_stops,
+                result_data.recommended_ev100,
+                result_data.recommended_calibration_offset,
+            ),
+        )
+        return result_data
+
+    def apply_hdri_calibration_offset(*_args):
+        result_data = calculate_hdri_ev()
+        cmds.floatFieldGrp(calib, edit=True, value1=result_data.recommended_calibration_offset)
+        calculate_only()
+        cmds.inViewMessage(
+            amg="Applied HDRI calibration offset <hl>%.3f</hl> stops" % result_data.recommended_calibration_offset,
+            pos="topCenter",
+            fade=True,
+        )
+
+    cmds.rowLayout(numberOfColumns=2, columnWidth2=(180, 180), adjustableColumn=2)
+    cmds.button(label="Estimate HDRI EV", command=calculate_hdri_ev)
+    cmds.button(label="Apply Suggested Offset", command=apply_hdri_calibration_offset)
+    cmds.setParent("..")
+
+    cmds.separator(height=8, style="in")
     cmds.text(
         label="Note: recommended exposure = -EV100 + exposure comp + calibration offset.\n"
         "EV100 is exposure metadata only; this tool does not change motion-blur shutter settings.\n"
-        "Calibration offset should be adjusted later with a grey-card/HDRI test.",
+        "HDRI EV Calibrator compares a sampled calibration cube against its target reflectance.",
         align="left",
     )
 

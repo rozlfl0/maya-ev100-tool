@@ -21,6 +21,7 @@ camera exposure = -EV100 + exposure compensation + calibration offset
   - `pbl_recommended_camera_exposure`
 - Applies the recommendation to Arnold `aiExposure` when that attribute exists on the camera shape.
 - Creates calibration cubes with neutral diffuse reflectance values `0.71`, `0.18`, and `0.031` for pixel-inspector/light-meter workflows.
+- Estimates an unknown HDRI's practical EV/calibration offset by comparing sampled linear RGB from a rendered calibration cube against its target reflectance.
 - Does **not** change Maya/Arnold motion-blur shutter, shutter angle, shutter open/close, or render motion-blur settings.
 
 ## Why Direct EV100?
@@ -101,6 +102,50 @@ Suggested workflow:
    - dark/shadow reference: `0.031`
 
 This mirrors the Unreal calibration note: find the value where white paper does not clip and charcoal does not crush, then use the resulting EV/calibration range as the shot or environment baseline.
+
+## HDRI EV Calibrator
+
+Use this when an HDRI has no trustworthy exposure metadata and you want to find the practical EV100 or offset for your Maya/Arnold setup.
+
+Important limitation: the tool does **not** prove the absolute real-world EV from the HDRI file alone. It estimates the EV/calibration correction from a rendered known target in your current scene, renderer, and color pipeline.
+
+Workflow:
+
+1. Load the HDRI into your sky dome/environment.
+2. Create the calibration cubes and place them at the measurement position.
+3. Set a starting EV100, for example `12` or `15`.
+4. Render.
+5. Sample the lit face of a cube in **linear RGB**.
+6. In **HDRI EV Calibrator**, choose the same target:
+   - `White Paper 0.71`
+   - `Middle Gray 0.18`
+   - `Charcoal 0.031`
+7. Enter sampled `R`, `G`, and `B`.
+8. Click **Estimate HDRI EV**.
+
+The calculation is:
+
+```text
+measured_average = (R + G + B) / 3
+correction_stops = log2(target_reflectance / measured_average)
+recommended_ev100 = current_ev100 - correction_stops
+recommended_calibration_offset = current_calibration_offset + correction_stops
+```
+
+Example:
+
+```text
+Current EV100: 12
+Target: Middle Gray 0.18
+Measured RGB: 0.72 / 0.72 / 0.72
+
+correction_stops = -2
+recommended_ev100 = 14
+```
+
+Meaning: the HDRI is rendering the gray card two stops too bright at EV100 12, so either use roughly `EV100 14` or apply a `-2` stop calibration offset.
+
+Click **Apply Suggested Offset** to write the recommended calibration offset into the main `Calibration Offset` field, then apply the camera settings if desired.
 
 ## Test Outside Maya
 

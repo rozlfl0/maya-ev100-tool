@@ -5,9 +5,11 @@ from maya_ev100_tool.ev100_core import (
     CALIBRATION_SWATCHES,
     DirectEV100Settings,
     ExposureSettings,
+    average_linear_rgb,
     calibration_swatch_by_name,
     ev100_from_camera_settings,
     camera_exposure_from_ev100,
+    estimate_hdri_ev_calibration,
     parse_shutter,
     luminance_stops_from_middle_gray,
 )
@@ -73,6 +75,36 @@ def test_calibration_swatch_rgb_is_neutral_reflectance_triplet():
 
 def test_calibration_cubes_default_to_45_degree_x_rotation():
     assert CALIBRATION_CUBE_ROTATE_X_DEGREES == pytest_approx(45.0)
+
+
+def test_average_linear_rgb_uses_simple_channel_average():
+    assert average_linear_rgb((0.2, 0.4, 0.6)) == pytest_approx(0.4)
+
+
+def test_estimate_hdri_ev_calibration_darkens_when_gray_renders_too_bright():
+    result = estimate_hdri_ev_calibration(
+        current_ev100=12.0,
+        measured_rgb=(0.72, 0.72, 0.72),
+        target_reflectance=0.18,
+    )
+
+    assert result.measured_average == pytest_approx(0.72)
+    assert result.correction_stops == pytest_approx(-2.0)
+    assert result.recommended_ev100 == pytest_approx(14.0)
+    assert result.recommended_calibration_offset == pytest_approx(-2.0)
+
+
+def test_estimate_hdri_ev_calibration_brightens_when_gray_renders_too_dark():
+    result = estimate_hdri_ev_calibration(
+        current_ev100=12.0,
+        measured_rgb=(0.09, 0.09, 0.09),
+        target_reflectance=0.18,
+        current_calibration_offset=0.5,
+    )
+
+    assert result.correction_stops == pytest_approx(1.0)
+    assert result.recommended_ev100 == pytest_approx(11.0)
+    assert result.recommended_calibration_offset == pytest_approx(1.5)
 
 
 def pytest_approx(value, **kwargs):
