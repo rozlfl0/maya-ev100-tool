@@ -185,23 +185,23 @@ To apply automatically, select the Arnold dome light transform or shape and clic
 
 Use this tab for practical/local sources such as bulbs, fluorescent tubes, LEDs, headlights, street lights, and other set lights.
 
-Current lumen presets from the reference table:
+Current Korean lumen presets from the reference table. Each preset now has a fixed light type, so there is no separate Rect / Point / Spot selector in the UI:
 
 ```text
-Candle              13 lm     1800K
-Kerosene            50 lm     1900K
-Incandescent        300 lm    2700K
-Decorative Light    300 lm    2700K
-LED                 400 lm    5600K
-General Lighting    435 lm    4000K
-Functional Lighting 1000 lm   4000K
-Interior Light      1000 lm   3200K
-Halogen             1500 lm   3200K
-Car Headlights      1500 lm   4300K
-Fluorescent & CFL   2000 lm   4000K
-Exterior Light      10000 lm  5600K
-Photo Flash         20000 lm  5600K
-Street Lights       60000 lm  2200K
+[Point] 촛불             13 lm     1800K
+[Point] 등유 램프        50 lm     1900K
+[Point] 백열전구         300 lm    2700K
+[Point] 장식등           300 lm    2700K
+[Point] LED 전구         400 lm    5600K
+[Rect]  일반 실내등      435 lm    4000K
+[Rect]  작업등           1000 lm   4000K
+[Rect]  실내 조명        1000 lm   3200K
+[Spot]  할로겐 스팟      1500 lm   3200K
+[Spot]  차량 헤드라이트  1500 lm   4300K
+[Rect]  형광등/CFL       2000 lm   4000K
+[Spot]  외부 조명        10000 lm  5600K
+[Point] 포토 플래시      20000 lm  5600K
+[Spot]  가로등           60000 lm  2200K
 ```
 
 Workflow:
@@ -209,14 +209,13 @@ Workflow:
 ```text
 1. Keep the camera EV100 as the shot-wide physical exposure reference.
 2. Open Local Light tab.
-3. Choose a lumen preset.
-4. Choose Rect / Point / Spot.
-5. Check or edit the suggested distance and source size.
-6. Select a subject/object if you want its bounding-box center as the target.
-7. Click 거리 Rig 생성.
-8. Render the generated 0.18 gray card under that local light.
-9. Enter sampled linear RGB.
-10. Select the local light and click 선택 Local 분석 or 선택 Local 적용.
+3. Choose a Korean lumen preset. The preset automatically chooses Point / Rect / Spot.
+4. Check or edit the suggested distance and source size.
+5. Select a subject/object if you want its bounding-box center as the target.
+6. Click 거리 Rig 생성.
+7. Render the generated 0.18 gray card under that local light.
+8. Enter sampled linear RGB.
+9. Select the local light and click 선택 Local 분석 or 선택 Local 적용.
 ```
 
 `거리 Rig 생성` creates:
@@ -229,17 +228,17 @@ PBL_<Preset>_GrayCard_0p18
 PBL_<Preset>_<Type> light
 ```
 
-The light is placed at the requested distance from the target and aimed toward it. If **선택 오브젝트 중심을 타겟으로 사용** is enabled, the selected object's bounding-box center becomes the target; otherwise the rig starts at world origin. The rig stores `pbl_distance_m`, `pbl_source_size_m`, `pbl_lumens`, and `pbl_kelvin` metadata.
+The light is placed at the requested meter distance from the target and aimed toward it. If **선택 오브젝트 중심을 타겟으로 사용** is enabled, the selected object's bounding-box center becomes the target; otherwise the rig starts at world origin. The rig converts meters to the current Maya scene unit, so in a default centimeter scene `0.5m` becomes `50` Maya units and `5m` becomes `500` Maya units. The rig stores `pbl_distance_m`, `pbl_source_size_m`, `pbl_lumens`, and `pbl_kelvin` metadata.
 
 Default distance/source-size starting points:
 
 ```text
-Candle           Point  0.5m  / 0.03m source
-Incandescent     Point  1.0m  / 0.08m source
-Functional Light Rect   1.2m  / 0.4m source
-Fluorescent      Rect   2.0m  / 1.2m source
-Car Headlights   Spot   5.0m  / 0.18m source
-Street Lights    Spot   8.0m  / 0.6m source
+촛불             Point  0.5m  / 0.03m source
+백열전구         Point  1.0m  / 0.08m source
+작업등           Rect   1.2m  / 0.4m source
+형광등/CFL       Rect   2.0m  / 1.2m source
+차량 헤드라이트  Spot   5.0m  / 0.18m source
+가로등           Spot   8.0m  / 0.6m source
 ```
 
 The lumen value is used as a practical starting scale:

@@ -28,6 +28,7 @@ from .ev100_core import (
     estimate_hdri_ev_calibration,
     local_light_exposure_from_lumens,
     local_light_intensity_from_lumens,
+    meters_to_scene_units,
     parse_shutter,
 )
 
@@ -202,9 +203,6 @@ def show() -> None:
     local_preset_menu = cmds.optionMenu(label="라이트 프리셋")
     for preset in LOCAL_LIGHT_PRESETS:
         cmds.menuItem(label=_local_light_preset_label(preset))
-    local_type_menu = cmds.optionMenu(label="라이트 타입")
-    for light_type in ("Rect", "Point", "Spot"):
-        cmds.menuItem(label=light_type)
     local_lumens = cmds.floatFieldGrp(label="루멘", value1=LOCAL_LIGHT_PRESETS[0].lumens, numberOfFields=1, precision=1)
     local_kelvin = cmds.floatFieldGrp(label="색온도 Kelvin", value1=LOCAL_LIGHT_PRESETS[0].kelvin, numberOfFields=1, precision=0)
     rect_width = cmds.floatFieldGrp(label="Rect 가로", value1=1.0, numberOfFields=1, precision=3)
@@ -229,21 +227,20 @@ def show() -> None:
 
     def load_local_preset(*_args):
         preset = _selected_local_preset()
-        light_type = cmds.optionMenu(local_type_menu, query=True, value=True)
-        rig = default_local_light_rig_settings(preset.name, light_type)
+        rig = default_local_light_rig_settings(preset.name, preset.light_type)
         cmds.floatFieldGrp(local_lumens, edit=True, value1=preset.lumens)
         cmds.floatFieldGrp(local_kelvin, edit=True, value1=preset.kelvin)
         cmds.floatFieldGrp(rig_distance, edit=True, value1=rig.distance_m)
         cmds.floatFieldGrp(source_size, edit=True, value1=rig.source_size_m)
-        if light_type == "Rect":
+        if preset.light_type == "Rect":
             cmds.floatFieldGrp(rect_width, edit=True, value1=rig.source_size_m)
             cmds.floatFieldGrp(rect_height, edit=True, value1=rig.source_size_m)
         range_text = " / range %s" % preset.common_range if preset.common_range else ""
-        cmds.text(local_note, edit=True, label="%s / %.1f lm / %.0fK%s / 거리 %.2fm / 크기 %.2fm - %s" % (preset.name, preset.lumens, preset.kelvin, range_text, rig.distance_m, rig.source_size_m, rig.note))
+        cmds.text(local_note, edit=True, label="%s [%s] / %.1f lm / %.0fK%s / 거리 %.2fm / 크기 %.2fm - %s" % (preset.name, preset.light_type, preset.lumens, preset.kelvin, range_text, rig.distance_m, rig.source_size_m, rig.note))
 
     def create_local_light_from_ui(*_args):
         node = create_local_light(
-            light_type=cmds.optionMenu(local_type_menu, query=True, value=True),
+            light_type=_selected_local_preset().light_type,
             lumens=cmds.floatFieldGrp(local_lumens, query=True, value1=True),
             kelvin=cmds.floatFieldGrp(local_kelvin, query=True, value1=True),
             rect_width=cmds.floatFieldGrp(rect_width, query=True, value1=True),
@@ -257,7 +254,7 @@ def show() -> None:
     def create_local_light_rig_from_ui(*_args):
         preset = _selected_local_preset()
         node = create_local_light_distance_rig(
-            light_type=cmds.optionMenu(local_type_menu, query=True, value=True),
+            light_type=preset.light_type,
             lumens=cmds.floatFieldGrp(local_lumens, query=True, value1=True),
             kelvin=cmds.floatFieldGrp(local_kelvin, query=True, value1=True),
             distance_m=cmds.floatFieldGrp(rig_distance, query=True, value1=True),
@@ -316,7 +313,6 @@ def show() -> None:
         return result_data
 
     cmds.optionMenu(local_preset_menu, edit=True, changeCommand=load_local_preset)
-    cmds.optionMenu(local_type_menu, edit=True, changeCommand=load_local_preset)
     cmds.rowLayout(numberOfColumns=4, columnWidth4=(150, 170, 170, 190), adjustableColumn=4)
     cmds.button(label="Local Light 생성", command=create_local_light_from_ui)
     cmds.button(label="거리 Rig 생성", command=create_local_light_rig_from_ui)
@@ -398,7 +394,7 @@ def _create_text_label(text: str, target: str, y_offset: float) -> str | None:
 
 def _local_light_preset_label(preset) -> str:
     range_text = " / %s" % preset.common_range if preset.common_range else ""
-    return "%s / %.0f lm / %.0fK%s" % (preset.name, preset.lumens, preset.kelvin, range_text)
+    return "[%s] %s / %.0f lm / %.0fK%s" % (preset.light_type, preset.name, preset.lumens, preset.kelvin, range_text)
 
 
 def create_local_light(
@@ -460,35 +456,37 @@ def create_local_light_distance_rig(
         raise ValueError("source_size_m must be positive")
 
     target_position = _selected_target_position() if use_selected_target else (0.0, 0.0, 0.0)
+    distance_scene = _meters_to_scene_units(distance_m)
+    source_size_scene = _meters_to_scene_units(source_size_m)
     safe_name = preset_name.replace(" ", "_")
     group = cmds.group(empty=True, name="PBL_%s_DistanceRig_GRP" % safe_name)
 
     target = cmds.spaceLocator(name="PBL_%s_Target_LOC" % safe_name)[0]
     cmds.xform(target, worldSpace=True, translation=target_position)
-    cmds.parent(target, group)
+    cmds.parent(target, group, absolute=True)
 
     light_node = create_local_light(
         light_type=light_type,
         lumens=lumens,
         kelvin=kelvin,
-        rect_width=source_size_m if light_type.lower() == "rect" else rect_width,
-        rect_height=source_size_m if light_type.lower() == "rect" else rect_height,
+        rect_width=source_size_scene if light_type.lower() == "rect" else rect_width,
+        rect_height=source_size_scene if light_type.lower() == "rect" else rect_height,
         cone_angle=cone_angle,
         preset_name=preset_name,
     )
     light_transform = _transform_for_node(light_node) or light_node
-    light_position = (target_position[0], target_position[1] + float(source_size_m) * 0.5, target_position[2] + float(distance_m))
+    light_position = (target_position[0], target_position[1] + source_size_scene * 0.5, target_position[2] + distance_scene)
     cmds.xform(light_transform, worldSpace=True, translation=light_position)
-    cmds.parent(light_transform, group)
+    cmds.parent(light_transform, group, absolute=True)
     _aim_light_at_target(light_transform, target)
 
-    guide = _create_distance_curve("PBL_%s_Distance_GUIDE" % safe_name, target_position, light_position)
+    guide = _create_distance_curve("PBL_%s_Distance_GUIDE" % safe_name, target_position, light_position, distance_m)
     if guide:
-        cmds.parent(guide, group)
+        cmds.parent(guide, group, absolute=True)
 
     if create_gray_card:
-        card = _create_middle_gray_card("PBL_%s_GrayCard_0p18" % safe_name, target_position, source_size_m)
-        cmds.parent(card, group)
+        card = _create_middle_gray_card("PBL_%s_GrayCard_0p18" % safe_name, target_position, source_size_scene)
+        cmds.parent(card, group, absolute=True)
 
     for node in (group, light_node):
         _set_or_add_double_attr(node, "pbl_distance_m", distance_m)
@@ -498,6 +496,16 @@ def create_local_light_distance_rig(
 
     cmds.select(light_node, replace=True)
     return light_node
+
+
+def _meters_to_scene_units(meters: float) -> float:
+    """Convert artist-facing meters to the current Maya linear scene unit."""
+    unit = "cm"
+    try:
+        unit = cmds.currentUnit(query=True, linear=True)
+    except Exception:
+        pass
+    return meters_to_scene_units(meters, unit)
 
 
 def _selected_target_position() -> tuple[float, float, float]:
@@ -511,18 +519,18 @@ def _selected_target_position() -> tuple[float, float, float]:
         return tuple(cmds.xform(selection[0], query=True, worldSpace=True, translation=True))
 
 
-def _create_distance_curve(name: str, start: tuple[float, float, float], end: tuple[float, float, float]) -> str | None:
+def _create_distance_curve(name: str, start: tuple[float, float, float], end: tuple[float, float, float], distance_m: float) -> str | None:
     try:
         curve = cmds.curve(name=name, degree=1, point=[start, end])
-        _set_or_add_double_attr(curve, "pbl_distance_m", ((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2 + (end[2] - start[2]) ** 2) ** 0.5)
+        _set_or_add_double_attr(curve, "pbl_distance_m", distance_m)
         return curve
     except Exception:
         return None
 
 
-def _create_middle_gray_card(name: str, target_position: tuple[float, float, float], source_size_m: float) -> str:
-    size = max(0.15, min(1.0, float(source_size_m) * 2.0))
-    card = cmds.polyCube(name=name, width=size, height=size, depth=0.02)[0]
+def _create_middle_gray_card(name: str, target_position: tuple[float, float, float], source_size_scene: float) -> str:
+    size = max(_meters_to_scene_units(0.15), min(_meters_to_scene_units(1.0), float(source_size_scene) * 2.0))
+    card = cmds.polyCube(name=name, width=size, height=size, depth=_meters_to_scene_units(0.02))[0]
     cmds.xform(card, worldSpace=True, translation=(target_position[0], target_position[1], target_position[2]))
     cmds.setAttr("%s.rotateX" % card, CALIBRATION_CUBE_ROTATE_X_DEGREES)
     shader = _create_lambert_reflectance_shader("local_gray_card", CALIBRATION_SWATCHES[0].rgb)

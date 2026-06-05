@@ -15,6 +15,7 @@ from maya_ev100_tool.ev100_core import (
     estimate_hdri_ev_calibration,
     local_light_exposure_from_lumens,
     local_light_intensity_from_lumens,
+    meters_to_scene_units,
     parse_shutter,
     luminance_stops_from_middle_gray,
 )
@@ -93,10 +94,13 @@ def test_average_linear_rgb_uses_simple_channel_average():
 
 def test_local_light_presets_include_reference_lumen_values_from_table():
     presets = {preset.name: preset for preset in LOCAL_LIGHT_PRESETS}
-    assert presets["Incandescent"].lumens == pytest_approx(300.0)
-    assert presets["Fluorescent & CFL"].lumens == pytest_approx(2000.0)
-    assert presets["Street Lights"].lumens == pytest_approx(60000.0)
-    assert presets["Candle"].kelvin == pytest_approx(1800.0)
+    assert presets["백열전구"].lumens == pytest_approx(300.0)
+    assert presets["형광등/CFL"].lumens == pytest_approx(2000.0)
+    assert presets["가로등"].lumens == pytest_approx(60000.0)
+    assert presets["촛불"].kelvin == pytest_approx(1800.0)
+    assert presets["촛불"].light_type == "Point"
+    assert presets["작업등"].light_type == "Rect"
+    assert presets["차량 헤드라이트"].light_type == "Spot"
 
 
 def test_local_light_lumen_scale_uses_1000_lumen_baseline():
@@ -107,18 +111,25 @@ def test_local_light_lumen_scale_uses_1000_lumen_baseline():
 
 
 def test_default_local_light_rig_settings_give_practical_distance_and_size():
-    candle = default_local_light_rig_settings("Candle")
+    candle = default_local_light_rig_settings("촛불")
     assert candle.distance_m == pytest_approx(0.5)
     assert candle.source_size_m == pytest_approx(0.03)
     assert candle.recommended_type == "Point"
 
-    car = default_local_light_rig_settings("Car Headlights")
+    car = default_local_light_rig_settings("차량 헤드라이트")
     assert car.distance_m == pytest_approx(5.0)
     assert car.recommended_type == "Spot"
 
     rect_candle = default_local_light_rig_settings("Candle", "Rect")
     assert rect_candle.recommended_type == "Rect"
     assert rect_candle.source_size_m >= 0.1
+
+
+def test_meters_to_scene_units_handles_default_maya_centimeters():
+    assert meters_to_scene_units(0.5, "cm") == pytest_approx(50.0)
+    assert meters_to_scene_units(5.0, "cm") == pytest_approx(500.0)
+    assert meters_to_scene_units(1.0, "m") == pytest_approx(1.0)
+    assert meters_to_scene_units(1.0, "ft") == pytest_approx(3.280839895)
 
 
 def test_estimate_hdri_ev_calibration_darkens_when_gray_renders_too_bright():

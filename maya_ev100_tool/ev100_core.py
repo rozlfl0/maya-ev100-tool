@@ -65,6 +65,7 @@ class LocalLightPreset:
     lumens: float
     category: str
     kelvin: float
+    light_type: str
     description: str = ""
     common_range: str = ""
 
@@ -113,20 +114,20 @@ EV100_SCENARIOS = (
 
 
 LOCAL_LIGHT_PRESETS = (
-    LocalLightPreset("Candle", 13.0, "practical", 1800.0, "Candle / small flame"),
-    LocalLightPreset("Kerosene", 50.0, "practical", 1900.0, "Kerosene lamp", "8-100 lm"),
-    LocalLightPreset("Incandescent", 300.0, "bulb", 2700.0, "Household tungsten bulb", "130-1500 lm"),
-    LocalLightPreset("Decorative Light", 300.0, "practical", 2700.0, "Decorative practical light"),
-    LocalLightPreset("LED", 400.0, "bulb", 5600.0, "Common LED bulb", "250-1500 lm"),
-    LocalLightPreset("General Lighting", 435.0, "room", 4000.0, "General small-room lighting", "400-470 lm"),
-    LocalLightPreset("Functional Lighting", 1000.0, "room", 4000.0, "Task / functional lighting", "806-1520 lm"),
-    LocalLightPreset("Interior Light", 1000.0, "room", 3200.0, "Interior practical light"),
-    LocalLightPreset("Halogen", 1500.0, "bulb", 3200.0, "Halogen / car or outdoor practical", "1000-2000 lm"),
-    LocalLightPreset("Car Headlights", 1500.0, "vehicle", 4300.0, "Single car headlight", "700-2000 lm"),
-    LocalLightPreset("Fluorescent & CFL", 2000.0, "tube", 4000.0, "Fluorescent / CFL fixture", "1000-5000 lm"),
-    LocalLightPreset("Exterior Light", 10000.0, "exterior", 5600.0, "Exterior fixture"),
-    LocalLightPreset("Photo Flash", 20000.0, "flash", 5600.0, "Photo flash burst"),
-    LocalLightPreset("Street Lights", 60000.0, "street", 2200.0, "Sodium-vapor style street light", "2000-140000 lm"),
+    LocalLightPreset("촛불", 13.0, "practical", 1800.0, "Point", "Candle / small flame"),
+    LocalLightPreset("등유 램프", 50.0, "practical", 1900.0, "Point", "Kerosene lamp", "8-100 lm"),
+    LocalLightPreset("백열전구", 300.0, "bulb", 2700.0, "Point", "Household tungsten bulb", "130-1500 lm"),
+    LocalLightPreset("장식등", 300.0, "practical", 2700.0, "Point", "Decorative practical light"),
+    LocalLightPreset("LED 전구", 400.0, "bulb", 5600.0, "Point", "Common LED bulb", "250-1500 lm"),
+    LocalLightPreset("일반 실내등", 435.0, "room", 4000.0, "Rect", "General small-room lighting", "400-470 lm"),
+    LocalLightPreset("작업등", 1000.0, "room", 4000.0, "Rect", "Task / functional light", "806-1520 lm"),
+    LocalLightPreset("실내 조명", 1000.0, "room", 3200.0, "Rect", "Interior practical light"),
+    LocalLightPreset("할로겐 스팟", 1500.0, "bulb", 3200.0, "Spot", "Halogen / directional practical", "1000-2000 lm"),
+    LocalLightPreset("차량 헤드라이트", 1500.0, "vehicle", 4300.0, "Spot", "Single car headlight", "700-2000 lm"),
+    LocalLightPreset("형광등/CFL", 2000.0, "tube", 4000.0, "Rect", "Fluorescent / CFL fixture", "1000-5000 lm"),
+    LocalLightPreset("외부 조명", 10000.0, "exterior", 5600.0, "Spot", "Exterior fixture"),
+    LocalLightPreset("포토 플래시", 20000.0, "flash", 5600.0, "Point", "Photo flash burst"),
+    LocalLightPreset("가로등", 60000.0, "street", 2200.0, "Spot", "Sodium-vapor style street light", "2000-140000 lm"),
 )
 
 
@@ -154,29 +155,70 @@ def local_light_intensity_from_lumens(lumens: float, baseline_lumens: float = 0.
     return float(lumens) / float(baseline_lumens)
 
 
+def meters_to_scene_units(meters: float, linear_unit: str = "cm") -> float:
+    """Convert meters to Maya scene units for a given linear unit.
+
+    Maya commonly defaults to centimeters, so 1.0 meter is 100 scene units in
+    a default scene. The input remains artist-facing meters.
+    """
+    meters_to_unit = {
+        "mm": 1000.0,
+        "millimeter": 1000.0,
+        "cm": 100.0,
+        "centimeter": 100.0,
+        "m": 1.0,
+        "meter": 1.0,
+        "km": 0.001,
+        "kilometer": 0.001,
+        "in": 39.37007874,
+        "inch": 39.37007874,
+        "ft": 3.280839895,
+        "foot": 3.280839895,
+        "yd": 1.093613298,
+        "yard": 1.093613298,
+    }
+    return float(meters) * meters_to_unit.get(str(linear_unit).strip().lower(), 100.0)
+
+
 def default_local_light_rig_settings(preset_name: str, light_type: str | None = None) -> LocalLightRigSettings:
     """Return practical distance/source-size defaults for a local-light preset.
 
     These are not strict physical values. They are starting points that help an
     artist place a light at a believable scale before gray-card calibration.
     """
-    key = str(preset_name).strip().lower()
+    aliases = {
+        "candle": "촛불",
+        "kerosene": "등유 램프",
+        "incandescent": "백열전구",
+        "decorative light": "장식등",
+        "led": "LED 전구",
+        "general lighting": "일반 실내등",
+        "functional lighting": "작업등",
+        "interior light": "실내 조명",
+        "halogen": "할로겐 스팟",
+        "car headlights": "차량 헤드라이트",
+        "fluorescent & cfl": "형광등/CFL",
+        "exterior light": "외부 조명",
+        "photo flash": "포토 플래시",
+        "street lights": "가로등",
+    }
+    key = aliases.get(str(preset_name).strip().lower(), str(preset_name).strip())
     requested_type = (light_type or "").strip().lower()
     defaults = {
-        "candle": LocalLightRigSettings(0.5, 0.03, "Point", "Small flame close to subject: 0.3-0.7 m."),
-        "kerosene": LocalLightRigSettings(0.8, 0.12, "Point", "Small practical lamp near subject: 0.5-1.5 m."),
-        "incandescent": LocalLightRigSettings(1.0, 0.08, "Point", "Bulb or lamp practical: 0.5-2 m."),
-        "decorative light": LocalLightRigSettings(1.0, 0.15, "Point", "Decorative practical near set dressing: 0.5-2 m."),
-        "led": LocalLightRigSettings(1.0, 0.08, "Point", "Small LED/bulb practical: 0.5-2 m."),
-        "general lighting": LocalLightRigSettings(2.0, 0.6, "Rect", "Room fixture/soft source: 1-3 m."),
-        "functional lighting": LocalLightRigSettings(1.2, 0.4, "Rect", "Task light or panel: 0.7-2 m."),
-        "interior light": LocalLightRigSettings(1.5, 0.5, "Rect", "Interior practical/soft source: 1-3 m."),
-        "halogen": LocalLightRigSettings(2.0, 0.12, "Spot", "Small directional practical: 1-4 m."),
-        "car headlights": LocalLightRigSettings(5.0, 0.18, "Spot", "Vehicle headlight distance test: 3-10 m."),
-        "fluorescent & cfl": LocalLightRigSettings(2.0, 1.2, "Rect", "Long tube/panel source: 1-3 m."),
-        "exterior light": LocalLightRigSettings(4.0, 0.5, "Spot", "Exterior fixture/flood: 3-8 m."),
-        "photo flash": LocalLightRigSettings(2.0, 0.12, "Point", "Flash-like small source: 1-3 m."),
-        "street lights": LocalLightRigSettings(8.0, 0.6, "Spot", "High street fixture: 5-12 m."),
+        "촛불": LocalLightRigSettings(0.5, 0.03, "Point", "작은 촛불/불꽃: 피사체 가까이 0.3-0.7 m."),
+        "등유 램프": LocalLightRigSettings(0.8, 0.12, "Point", "작은 실내 practical 램프: 0.5-1.5 m."),
+        "백열전구": LocalLightRigSettings(1.0, 0.08, "Point", "전구/스탠드 practical: 0.5-2 m."),
+        "장식등": LocalLightRigSettings(1.0, 0.15, "Point", "작은 장식 practical: 0.5-2 m."),
+        "LED 전구": LocalLightRigSettings(1.0, 0.08, "Point", "작은 LED/전구 practical: 0.5-2 m."),
+        "일반 실내등": LocalLightRigSettings(2.0, 0.6, "Rect", "실내 천장등/부드러운 면광원: 1-3 m."),
+        "작업등": LocalLightRigSettings(1.2, 0.4, "Rect", "작업등/패널 라이트: 0.7-2 m."),
+        "실내 조명": LocalLightRigSettings(1.5, 0.5, "Rect", "실내 practical/부드러운 광원: 1-3 m."),
+        "할로겐 스팟": LocalLightRigSettings(2.0, 0.12, "Spot", "작은 방향성 practical: 1-4 m."),
+        "차량 헤드라이트": LocalLightRigSettings(5.0, 0.18, "Spot", "차량 헤드라이트 거리 테스트: 3-10 m."),
+        "형광등/CFL": LocalLightRigSettings(2.0, 1.2, "Rect", "긴 형광등/패널 광원: 1-3 m."),
+        "외부 조명": LocalLightRigSettings(4.0, 0.5, "Spot", "외부 fixture/flood: 3-8 m."),
+        "포토 플래시": LocalLightRigSettings(2.0, 0.12, "Point", "플래시 느낌의 작은 광원: 1-3 m."),
+        "가로등": LocalLightRigSettings(8.0, 0.6, "Spot", "높은 가로등 fixture: 5-12 m."),
     }
     settings = defaults.get(key, LocalLightRigSettings(1.0, 0.1, "Point", "Generic local light: adjust distance, then gray-card calibrate."))
     if requested_type:
