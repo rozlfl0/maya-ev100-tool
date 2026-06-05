@@ -1,24 +1,20 @@
 # Maya EV100 Camera Exposure MVP
 
-Maya에서 EV100 기준으로 카메라 노출 메타데이터와 Arnold `aiExposure`를 맞추는 첫 MVP입니다.
+A small Maya helper for calculating EV100 from physical camera settings and applying the recommended exposure stop offset to a selected Maya camera.
 
-## 설치/실행
+The core EV100 math lives in `maya_ev100_tool.ev100_core` and has no Maya dependency, so it can be tested outside Maya. The Maya UI and camera attribute updates live in `maya_ev100_tool.maya_ev100_camera`.
 
-Maya Script Editor의 Python 탭에서 실행:
+## What It Does
 
-```python
-import sys
-sys.path.insert(0, r"C:/Users/maste/Desktop/maya_ev100_tool")
-from maya_ev100_tool import maya_ev100_camera
-maya_ev100_camera.show()
+- Accepts ISO, shutter speed, f-stop, exposure compensation, and calibration offset.
+- Calculates EV100 from the physical camera settings.
+- Calculates the recommended Maya/Arnold camera exposure:
+
+```text
+camera exposure = -EV100 + exposure compensation + calibration offset
 ```
 
-## 현재 기능
-
-- ISO / shutter / f-stop 입력
-- EV100 계산
-- `recommended camera exposure = -EV100 + exposure compensation + calibration offset` 계산
-- 선택한 Maya camera shape에 custom attrs 저장
+- Stores the calculated values as custom attributes on the selected camera shape:
   - `pbl_ev100`
   - `pbl_iso`
   - `pbl_shutter_seconds`
@@ -26,14 +22,38 @@ maya_ev100_camera.show()
   - `pbl_exposure_compensation`
   - `pbl_calibration_offset`
   - `pbl_recommended_camera_exposure`
-- camera shape에 Arnold `aiExposure` attr가 있으면 자동 적용
+- Applies the recommendation to Arnold `aiExposure` when that attribute exists on the camera shape.
 
-## 중요한 전제
+## Use In Maya
 
-이 MVP의 Arnold 노출 매핑은 시작점입니다.
+Run this from the Maya Script Editor Python tab:
+
+```python
+import sys
+
+sys.path.insert(0, r"C:/Users/maste/Desktop/maya_ev100_tool")
+
+from maya_ev100_tool import maya_ev100_camera
+
+maya_ev100_camera.show()
+```
+
+Then select a camera transform or camera shape, enter the physical camera settings, and click **Apply to Selected Camera**.
+
+## Test Outside Maya
+
+The pure EV100 helpers can be tested with pytest:
+
+```bash
+python -m pytest -q
+```
+
+## Calibration Note
+
+This MVP uses a simple exposure-stop mapping:
 
 ```text
 Maya/Arnold exposure stops = -EV100 + exposure compensation + calibration offset
 ```
 
-다음 MVP에서 18% gray card / HDRI calibration rig를 붙여서 `calibration_offset`을 실제 파이프라인 기준으로 보정하면 됩니다.
+For production use, calibrate `calibration_offset` with your studio's Arnold, OCIO, HDRI, and grey-card workflow.
