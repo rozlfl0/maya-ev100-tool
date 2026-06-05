@@ -9,6 +9,7 @@ from maya_ev100_tool.ev100_core import (
     LOCAL_LIGHT_PRESETS,
     average_linear_rgb,
     calibration_swatch_by_name,
+    default_local_light_rig_settings,
     ev100_from_camera_settings,
     camera_exposure_from_ev100,
     estimate_hdri_ev_calibration,
@@ -103,6 +104,21 @@ def test_local_light_lumen_scale_uses_1000_lumen_baseline():
     assert local_light_exposure_from_lumens(2000.0) == pytest_approx(1.0)
     assert local_light_intensity_from_lumens(13.0) == pytest_approx(1300.0)
     assert local_light_intensity_from_lumens(500.0) == pytest_approx(50000.0)
+
+
+def test_default_local_light_rig_settings_give_practical_distance_and_size():
+    candle = default_local_light_rig_settings("Candle")
+    assert candle.distance_m == pytest_approx(0.5)
+    assert candle.source_size_m == pytest_approx(0.03)
+    assert candle.recommended_type == "Point"
+
+    car = default_local_light_rig_settings("Car Headlights")
+    assert car.distance_m == pytest_approx(5.0)
+    assert car.recommended_type == "Spot"
+
+    rect_candle = default_local_light_rig_settings("Candle", "Rect")
+    assert rect_candle.recommended_type == "Rect"
+    assert rect_candle.source_size_m >= 0.1
 
 
 def test_estimate_hdri_ev_calibration_darkens_when_gray_renders_too_bright():

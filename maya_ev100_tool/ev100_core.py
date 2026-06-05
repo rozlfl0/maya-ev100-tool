@@ -69,6 +69,16 @@ class LocalLightPreset:
     common_range: str = ""
 
 
+@dataclass(frozen=True)
+class LocalLightRigSettings:
+    """Artist-facing distance/size defaults for a local light rig."""
+
+    distance_m: float
+    source_size_m: float
+    recommended_type: str
+    note: str
+
+
 CALIBRATION_SWATCHES = (
     CalibrationSwatch(
         name="middle_gray",
@@ -142,6 +152,40 @@ def local_light_intensity_from_lumens(lumens: float, baseline_lumens: float = 0.
     _require_positive("lumens", lumens)
     _require_positive("baseline_lumens", baseline_lumens)
     return float(lumens) / float(baseline_lumens)
+
+
+def default_local_light_rig_settings(preset_name: str, light_type: str | None = None) -> LocalLightRigSettings:
+    """Return practical distance/source-size defaults for a local-light preset.
+
+    These are not strict physical values. They are starting points that help an
+    artist place a light at a believable scale before gray-card calibration.
+    """
+    key = str(preset_name).strip().lower()
+    requested_type = (light_type or "").strip().lower()
+    defaults = {
+        "candle": LocalLightRigSettings(0.5, 0.03, "Point", "Small flame close to subject: 0.3-0.7 m."),
+        "kerosene": LocalLightRigSettings(0.8, 0.12, "Point", "Small practical lamp near subject: 0.5-1.5 m."),
+        "incandescent": LocalLightRigSettings(1.0, 0.08, "Point", "Bulb or lamp practical: 0.5-2 m."),
+        "decorative light": LocalLightRigSettings(1.0, 0.15, "Point", "Decorative practical near set dressing: 0.5-2 m."),
+        "led": LocalLightRigSettings(1.0, 0.08, "Point", "Small LED/bulb practical: 0.5-2 m."),
+        "general lighting": LocalLightRigSettings(2.0, 0.6, "Rect", "Room fixture/soft source: 1-3 m."),
+        "functional lighting": LocalLightRigSettings(1.2, 0.4, "Rect", "Task light or panel: 0.7-2 m."),
+        "interior light": LocalLightRigSettings(1.5, 0.5, "Rect", "Interior practical/soft source: 1-3 m."),
+        "halogen": LocalLightRigSettings(2.0, 0.12, "Spot", "Small directional practical: 1-4 m."),
+        "car headlights": LocalLightRigSettings(5.0, 0.18, "Spot", "Vehicle headlight distance test: 3-10 m."),
+        "fluorescent & cfl": LocalLightRigSettings(2.0, 1.2, "Rect", "Long tube/panel source: 1-3 m."),
+        "exterior light": LocalLightRigSettings(4.0, 0.5, "Spot", "Exterior fixture/flood: 3-8 m."),
+        "photo flash": LocalLightRigSettings(2.0, 0.12, "Point", "Flash-like small source: 1-3 m."),
+        "street lights": LocalLightRigSettings(8.0, 0.6, "Spot", "High street fixture: 5-12 m."),
+    }
+    settings = defaults.get(key, LocalLightRigSettings(1.0, 0.1, "Point", "Generic local light: adjust distance, then gray-card calibrate."))
+    if requested_type:
+        normalized_type = requested_type.capitalize()
+        if normalized_type == "Rect":
+            settings = LocalLightRigSettings(settings.distance_m, max(settings.source_size_m, 0.1), "Rect", settings.note)
+        elif normalized_type in {"Point", "Spot"}:
+            settings = LocalLightRigSettings(settings.distance_m, settings.source_size_m, normalized_type, settings.note)
+    return settings
 
 
 def calibration_swatch_by_name(name: str) -> CalibrationSwatch:

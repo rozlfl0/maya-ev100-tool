@@ -211,11 +211,35 @@ Workflow:
 2. Open Local Light tab.
 3. Choose a lumen preset.
 4. Choose Rect / Point / Spot.
-5. Set Rect size or Spot cone angle when needed.
-6. Click Local Light 생성.
-7. Render the 0.18 gray cube under that local light.
-8. Enter sampled linear RGB.
-9. Select the local light and click 선택 Local 분석 or 선택 Local 적용.
+5. Check or edit the suggested distance and source size.
+6. Select a subject/object if you want its bounding-box center as the target.
+7. Click 거리 Rig 생성.
+8. Render the generated 0.18 gray card under that local light.
+9. Enter sampled linear RGB.
+10. Select the local light and click 선택 Local 분석 or 선택 Local 적용.
+```
+
+`거리 Rig 생성` creates:
+
+```text
+PBL_<Preset>_DistanceRig_GRP
+PBL_<Preset>_Target_LOC
+PBL_<Preset>_Distance_GUIDE
+PBL_<Preset>_GrayCard_0p18
+PBL_<Preset>_<Type> light
+```
+
+The light is placed at the requested distance from the target and aimed toward it. If **선택 오브젝트 중심을 타겟으로 사용** is enabled, the selected object's bounding-box center becomes the target; otherwise the rig starts at world origin. The rig stores `pbl_distance_m`, `pbl_source_size_m`, `pbl_lumens`, and `pbl_kelvin` metadata.
+
+Default distance/source-size starting points:
+
+```text
+Candle           Point  0.5m  / 0.03m source
+Incandescent     Point  1.0m  / 0.08m source
+Functional Light Rect   1.2m  / 0.4m source
+Fluorescent      Rect   2.0m  / 1.2m source
+Car Headlights   Spot   5.0m  / 0.18m source
+Street Lights    Spot   8.0m  / 0.6m source
 ```
 
 The lumen value is used as a practical starting scale:
